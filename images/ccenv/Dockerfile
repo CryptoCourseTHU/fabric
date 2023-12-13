@@ -32,6 +32,7 @@ RUN apt update && apt install -y \
 
 RUN curl -sL https://go.dev/dl/go${GO_VER}.${TARGETOS}-${TARGETARCH}.tar.gz | tar zxvf - -C /usr/local
 ENV PATH="/usr/local/go/bin:$PATH"
+RUN go env -w GOPROXY='https://goproxy.cn,direct'
 
 RUN addgroup --gid 500 chaincode
 RUN adduser  --disabled-password --gecos "" --uid 500 --gid 500 --home /home/chaincode chaincode
