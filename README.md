@@ -12,3 +12,7 @@ The origin README.md is [README_ORIGIN.md](README_ORIGIN.md)
   - images/** 中的 Dockerfile 需要修改：在安装完 Golang 之后添加官方国内镜像（已改完，仅作说明）
   - [安装依赖](https://hyperledger-fabric.readthedocs.io/en/latest/dev-setup/devenv.html)
   - 编译全部：`make dist-clean all`
+
+## 工具和参考
+
+- 开源 国密算法库（SM2/3/4）：<https://github.com/tjfoc/gmsm>
