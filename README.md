@@ -1,6 +1,6 @@
 # Hyperledger Fabric 国密化改造
 
-The origin README.md is [README_ORIGIN.md](README_ORIGIN.md)
+The original README.md is [README_ORIGIN.md](README_ORIGIN.md)
 
 ## 环境配置
 
