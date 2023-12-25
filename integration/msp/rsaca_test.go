@@ -17,6 +17,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"hash"
 	"math/big"
 	"net"
 	"os"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+	"github.com/hyperledger/fabric/bccsp/factory"
 	"github.com/hyperledger/fabric/integration/channelparticipation"
 	"github.com/hyperledger/fabric/integration/nwo"
 	"github.com/hyperledger/fabric/integration/nwo/commands"
@@ -34,6 +36,7 @@ import (
 	"github.com/onsi/gomega/gexec"
 	"github.com/tedsuo/ifrit"
 	ginkgomon "github.com/tedsuo/ifrit/ginkgomon_v2"
+	"github.com/tjfoc/gmsm/sm3"
 	"gopkg.in/yaml.v2"
 )
 
@@ -460,6 +463,12 @@ func computeSKI(key crypto.PublicKey) []byte {
 	default:
 		panic(fmt.Sprintf("unexpected type: %T", key))
 	}
-	hash := sha256.Sum256(raw)
-	return hash[:]
+	var hash hash.Hash
+	if factory.GetDefaultOpts().Default == "SW" {
+		hash = sha256.New()
+	} else {
+		hash = sm3.New()
+	}
+	hash.Write(raw)
+	return hash.Sum(nil)
 }

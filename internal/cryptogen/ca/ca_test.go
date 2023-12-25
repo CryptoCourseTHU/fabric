@@ -6,7 +6,6 @@ SPDX-License-Identifier: Apache-2.0
 package ca_test
 
 import (
-	"crypto/ecdsa"
 	"crypto/x509"
 	"net"
 	"os"
@@ -16,6 +15,8 @@ import (
 	"github.com/hyperledger/fabric/internal/cryptogen/ca"
 	"github.com/hyperledger/fabric/internal/cryptogen/csp"
 	"github.com/stretchr/testify/require"
+	"github.com/tjfoc/gmsm/sm2"
+	gmsmx509 "github.com/tjfoc/gmsm/x509"
 )
 
 const (
@@ -65,7 +66,7 @@ func TestLoadCertificateECDSA(t *testing.T) {
 		testName3,
 		nil,
 		nil,
-		&priv.PublicKey,
+		priv.PublicKey,
 		x509.KeyUsageDigitalSignature|x509.KeyUsageKeyEncipherment,
 		[]x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	)
@@ -135,18 +136,18 @@ func TestNewCA(t *testing.T) {
 	require.Equal(t, true, checkForFile(pemFile),
 		"Expected to find file "+pemFile)
 
-	require.NotEmpty(t, rootCA.SignCert.Subject.Country, "country cannot be empty.")
-	require.Equal(t, testCountry, rootCA.SignCert.Subject.Country[0], "Failed to match country")
-	require.NotEmpty(t, rootCA.SignCert.Subject.Province, "province cannot be empty.")
-	require.Equal(t, testProvince, rootCA.SignCert.Subject.Province[0], "Failed to match province")
-	require.NotEmpty(t, rootCA.SignCert.Subject.Locality, "locality cannot be empty.")
-	require.Equal(t, testLocality, rootCA.SignCert.Subject.Locality[0], "Failed to match locality")
-	require.NotEmpty(t, rootCA.SignCert.Subject.OrganizationalUnit, "organizationalUnit cannot be empty.")
-	require.Equal(t, testOrganizationalUnit, rootCA.SignCert.Subject.OrganizationalUnit[0], "Failed to match organizationalUnit")
-	require.NotEmpty(t, rootCA.SignCert.Subject.StreetAddress, "streetAddress cannot be empty.")
-	require.Equal(t, testStreetAddress, rootCA.SignCert.Subject.StreetAddress[0], "Failed to match streetAddress")
-	require.NotEmpty(t, rootCA.SignCert.Subject.PostalCode, "postalCode cannot be empty.")
-	require.Equal(t, testPostalCode, rootCA.SignCert.Subject.PostalCode[0], "Failed to match postalCode")
+	require.NotEmpty(t, rootCA.SignCert.(*gmsmx509.Certificate).Subject.Country, "country cannot be empty.")
+	require.Equal(t, testCountry, rootCA.SignCert.(*gmsmx509.Certificate).Subject.Country[0], "Failed to match country")
+	require.NotEmpty(t, rootCA.SignCert.(*gmsmx509.Certificate).Subject.Province, "province cannot be empty.")
+	require.Equal(t, testProvince, rootCA.SignCert.(*gmsmx509.Certificate).Subject.Province[0], "Failed to match province")
+	require.NotEmpty(t, rootCA.SignCert.(*gmsmx509.Certificate).Subject.Locality, "locality cannot be empty.")
+	require.Equal(t, testLocality, rootCA.SignCert.(*gmsmx509.Certificate).Subject.Locality[0], "Failed to match locality")
+	require.NotEmpty(t, rootCA.SignCert.(*gmsmx509.Certificate).Subject.OrganizationalUnit, "organizationalUnit cannot be empty.")
+	require.Equal(t, testOrganizationalUnit, rootCA.SignCert.(*gmsmx509.Certificate).Subject.OrganizationalUnit[0], "Failed to match organizationalUnit")
+	require.NotEmpty(t, rootCA.SignCert.(*gmsmx509.Certificate).Subject.StreetAddress, "streetAddress cannot be empty.")
+	require.Equal(t, testStreetAddress, rootCA.SignCert.(*gmsmx509.Certificate).Subject.StreetAddress[0], "Failed to match streetAddress")
+	require.NotEmpty(t, rootCA.SignCert.(*gmsmx509.Certificate).Subject.PostalCode, "postalCode cannot be empty.")
+	require.Equal(t, testPostalCode, rootCA.SignCert.(*gmsmx509.Certificate).Subject.PostalCode[0], "Failed to match postalCode")
 }
 
 func TestGenerateSignCertificate(t *testing.T) {
@@ -180,7 +181,7 @@ func TestGenerateSignCertificate(t *testing.T) {
 		testName,
 		nil,
 		nil,
-		&priv.PublicKey,
+		priv.PublicKey,
 		x509.KeyUsageDigitalSignature|x509.KeyUsageKeyEncipherment,
 		[]x509.ExtKeyUsage{x509.ExtKeyUsageAny},
 	)
@@ -195,7 +196,7 @@ func TestGenerateSignCertificate(t *testing.T) {
 		testName,
 		nil,
 		nil,
-		&priv.PublicKey,
+		priv.PublicKey,
 		x509.KeyUsageDigitalSignature,
 		[]x509.ExtKeyUsage{},
 	)
@@ -204,7 +205,7 @@ func TestGenerateSignCertificate(t *testing.T) {
 
 	// make sure ous are correctly set
 	ous := []string{"TestOU", "PeerOU"}
-	cert, err = rootCA.SignCertificate(certDir, testName, ous, nil, &priv.PublicKey,
+	cert, err = rootCA.SignCertificate(certDir, testName, ous, nil, priv.PublicKey,
 		x509.KeyUsageDigitalSignature, []x509.ExtKeyUsage{})
 	require.NoError(t, err)
 	require.Contains(t, cert.Subject.OrganizationalUnit, ous[0])
@@ -212,7 +213,7 @@ func TestGenerateSignCertificate(t *testing.T) {
 
 	// make sure sans are correctly set
 	sans := []string{testName2, testName3, testIP}
-	cert, err = rootCA.SignCertificate(certDir, testName, nil, sans, &priv.PublicKey,
+	cert, err = rootCA.SignCertificate(certDir, testName, nil, sans, priv.PublicKey,
 		x509.KeyUsageDigitalSignature, []x509.ExtKeyUsage{})
 	require.NoError(t, err)
 	require.Contains(t, cert.DNSNames, testName2)
@@ -225,7 +226,7 @@ func TestGenerateSignCertificate(t *testing.T) {
 	require.Equal(t, true, checkForFile(pemFile),
 		"Expected to find file "+pemFile)
 
-	_, err = rootCA.SignCertificate(certDir, "empty/CA", nil, nil, &priv.PublicKey,
+	_, err = rootCA.SignCertificate(certDir, "empty/CA", nil, nil, priv.PublicKey,
 		x509.KeyUsageKeyEncipherment, []x509.ExtKeyUsage{x509.ExtKeyUsageAny})
 	require.Error(t, err, "Bad name should fail")
 
@@ -234,7 +235,7 @@ func TestGenerateSignCertificate(t *testing.T) {
 		Name:     "badCA",
 		SignCert: &x509.Certificate{},
 	}
-	_, err = badCA.SignCertificate(certDir, testName, nil, nil, &ecdsa.PublicKey{},
+	_, err = badCA.SignCertificate(certDir, testName, nil, nil, &sm2.PublicKey{},
 		x509.KeyUsageKeyEncipherment, []x509.ExtKeyUsage{x509.ExtKeyUsageAny})
 	require.Error(t, err, "Empty CA should not be able to sign")
 }

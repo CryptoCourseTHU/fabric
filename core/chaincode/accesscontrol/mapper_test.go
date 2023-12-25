@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric/bccsp"
-	"github.com/hyperledger/fabric/bccsp/sw"
+	"github.com/hyperledger/fabric/bccsp/gm"
 	"github.com/hyperledger/fabric/common/crypto/tlsgen"
 	"github.com/stretchr/testify/require"
 )
@@ -27,10 +27,10 @@ func TestPurge(t *testing.T) {
 	k, err := m.genCert("A")
 	require.NoError(t, err)
 
-	cryptoProvider, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
+	cryptoProvider, err := gm.NewDefaultSecurityLevelWithKeystore(gm.NewDummyKeyStore())
 	require.NoError(t, err)
 
-	hash, err := cryptoProvider.Hash(k.TLSCert.Raw, &bccsp.SHA256Opts{})
+	hash, err := cryptoProvider.Hash(k.TLSCert.Raw, &bccsp.SM3Opts{})
 	require.NoError(t, err)
 	require.Equal(t, "A", m.lookup(certHash(hash)))
 	time.Sleep(time.Second * 3)

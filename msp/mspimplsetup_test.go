@@ -142,7 +142,7 @@ func TestMalformedCertsChainSetup(t *testing.T) {
 	cp, err := sw.NewDefaultSecurityLevelWithKeystore(sw.NewDummyKeyStore())
 	gt.Expect(err).NotTo(gomega.HaveOccurred())
 
-	cp.GetHash(&bccsp.SHA256Opts{})
+	cp.GetHash(&bccsp.SM3Opts{})
 	mspImpl := &bccspmsp{
 		opts:  &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()},
 		bccsp: cp,

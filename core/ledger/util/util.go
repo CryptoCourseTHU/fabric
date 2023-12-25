@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"sort"
 
+	"github.com/hyperledger/fabric/bccsp/factory"
 	"github.com/hyperledger/fabric/common/util"
 )
 
@@ -86,5 +87,9 @@ func ComputeStringHash(input string) []byte {
 
 // ComputeHash computes the hash of the given bytes
 func ComputeHash(input []byte) []byte {
-	return util.ComputeSHA256(input)
+	if factory.GetDefaultOpts().Default == "SW" {
+		return util.ComputeSHA256(input)
+	} else {
+		return util.ComputeSM3(input)
+	}
 }

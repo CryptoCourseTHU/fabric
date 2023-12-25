@@ -68,7 +68,7 @@ func TestToLowS(t *testing.T) {
 			key := ecdsa.PublicKey{
 				Curve: curve,
 			}
-			require.Equal(t, test.expectedSig, toLowS(key, test.sig))
+			require.Equal(t, test.expectedSig, toLowSForECDSA(key, test.sig))
 		})
 	}
 }

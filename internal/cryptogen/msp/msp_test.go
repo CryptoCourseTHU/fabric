@@ -6,6 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 package msp_test
 
 import (
+	"crypto/x509"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,18 +50,18 @@ func testGenerateLocalMSP(t *testing.T, nodeOUs bool) {
 	tlsCA, err := ca.NewCA(tlsCADir, testCAOrg, testCAName, testCountry, testProvince, testLocality, testOrganizationalUnit, testStreetAddress, testPostalCode)
 	require.NoError(t, err, "Error generating CA")
 
-	require.NotEmpty(t, signCA.SignCert.Subject.Country, "country cannot be empty.")
-	require.Equal(t, testCountry, signCA.SignCert.Subject.Country[0], "Failed to match country")
-	require.NotEmpty(t, signCA.SignCert.Subject.Province, "province cannot be empty.")
-	require.Equal(t, testProvince, signCA.SignCert.Subject.Province[0], "Failed to match province")
-	require.NotEmpty(t, signCA.SignCert.Subject.Locality, "locality cannot be empty.")
-	require.Equal(t, testLocality, signCA.SignCert.Subject.Locality[0], "Failed to match locality")
-	require.NotEmpty(t, signCA.SignCert.Subject.OrganizationalUnit, "organizationalUnit cannot be empty.")
-	require.Equal(t, testOrganizationalUnit, signCA.SignCert.Subject.OrganizationalUnit[0], "Failed to match organizationalUnit")
-	require.NotEmpty(t, signCA.SignCert.Subject.StreetAddress, "streetAddress cannot be empty.")
-	require.Equal(t, testStreetAddress, signCA.SignCert.Subject.StreetAddress[0], "Failed to match streetAddress")
-	require.NotEmpty(t, signCA.SignCert.Subject.PostalCode, "postalCode cannot be empty.")
-	require.Equal(t, testPostalCode, signCA.SignCert.Subject.PostalCode[0], "Failed to match postalCode")
+	require.NotEmpty(t, signCA.SignCert.(*x509.Certificate).Subject.Country, "country cannot be empty.")
+	require.Equal(t, testCountry, signCA.SignCert.(*x509.Certificate).Subject.Country[0], "Failed to match country")
+	require.NotEmpty(t, signCA.SignCert.(*x509.Certificate).Subject.Province, "province cannot be empty.")
+	require.Equal(t, testProvince, signCA.SignCert.(*x509.Certificate).Subject.Province[0], "Failed to match province")
+	require.NotEmpty(t, signCA.SignCert.(*x509.Certificate).Subject.Locality, "locality cannot be empty.")
+	require.Equal(t, testLocality, signCA.SignCert.(*x509.Certificate).Subject.Locality[0], "Failed to match locality")
+	require.NotEmpty(t, signCA.SignCert.(*x509.Certificate).Subject.OrganizationalUnit, "organizationalUnit cannot be empty.")
+	require.Equal(t, testOrganizationalUnit, signCA.SignCert.(*x509.Certificate).Subject.OrganizationalUnit[0], "Failed to match organizationalUnit")
+	require.NotEmpty(t, signCA.SignCert.(*x509.Certificate).Subject.StreetAddress, "streetAddress cannot be empty.")
+	require.Equal(t, testStreetAddress, signCA.SignCert.(*x509.Certificate).Subject.StreetAddress[0], "Failed to match streetAddress")
+	require.NotEmpty(t, signCA.SignCert.(*x509.Certificate).Subject.PostalCode, "postalCode cannot be empty.")
+	require.Equal(t, testPostalCode, signCA.SignCert.(*x509.Certificate).Subject.PostalCode[0], "Failed to match postalCode")
 
 	// generate local MSP for nodeType=PEER
 	err = msp.GenerateLocalMSP(testDir, testName, nil, signCA, tlsCA, msp.PEER, nodeOUs)
