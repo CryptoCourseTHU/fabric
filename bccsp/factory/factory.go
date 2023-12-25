@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package factory
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/hyperledger/fabric/bccsp"
@@ -44,9 +45,9 @@ func GetDefault() bccsp.BCCSP {
 		logger.Debug("Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.")
 		bootBCCSPInitOnce.Do(func() {
 			var err error
-			bootBCCSP, err = (&SWFactory{}).Get(GetDefaultOpts())
+			bootBCCSP, err = (&GMFactory{}).Get(GetDefaultOpts())
 			if err != nil {
-				panic("BCCSP Internal error, failed initialization with GetDefaultOpts!")
+				panic(fmt.Sprintf("BCCSP Internal error, failed initialization with GetDefaultOpts! Original error: %v", err))
 			}
 		})
 		return bootBCCSP

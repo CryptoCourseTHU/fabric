@@ -32,6 +32,14 @@ const (
 	AES192 = "AES192"
 	// AES256 Advanced Encryption Standard at 256 bit security level
 	AES256 = "AES256"
+	// SM2
+	SM2 = "SM2"
+	// SM2ReRand SM2 key re-randomization
+	SM2ReRand = "SM2_RERAND"
+	// SM3
+	SM3 = "SM3"
+	// SM4
+	SM4 = "SM4"
 
 	// HMAC keyed-hash message authentication code
 	HMAC = "HMAC"

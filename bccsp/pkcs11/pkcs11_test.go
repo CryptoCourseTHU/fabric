@@ -347,6 +347,8 @@ func TestKeyMapper(t *testing.T) {
 
 	digest, err := csp.Hash([]byte("Hello World"), &bccsp.SHAOpts{})
 	require.NoError(t, err)
+	digest, err := csp.Hash([]byte("Hello World"), &bccsp.SM3Opts{})
+	require.NoError(t, err)
 
 	sess, err := csp.getSession()
 	require.NoError(t, err, "failed to get session")
@@ -825,7 +827,7 @@ func TestDelegation(t *testing.T) {
 	})
 
 	t.Run("GetHash", func(t *testing.T) {
-		h, err := csp.GetHash(&bccsp.SHA256Opts{})
+		h, err := csp.GetHash(&bccsp.SM3Opts{})
 		require.NoError(t, err)
 		require.Equal(t, sha256.New(), h)
 	})

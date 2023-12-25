@@ -23,6 +23,7 @@ const pkcs11Enabled = false
 type FactoryOpts struct {
 	Default string  `json:"default" yaml:"Default"`
 	SW      *SwOpts `json:"SW,omitempty" yaml:"SW,omitempty"`
+	GM      *SwOpts `json:"GM,omitempty" yaml:"GM,omitempty"`
 }
 
 // InitFactories must be called before using factory interfaces
@@ -44,7 +45,7 @@ func initFactories(config *FactoryOpts) error {
 	}
 
 	if config.Default == "" {
-		config.Default = "SW"
+		config.Default = "GM"
 	}
 
 	if config.SW == nil {
@@ -54,6 +55,15 @@ func initFactories(config *FactoryOpts) error {
 	// Software-Based BCCSP
 	if config.Default == "SW" && config.SW != nil {
 		f := &SWFactory{}
+		var err error
+		defaultBCCSP, err = initBCCSP(f, config)
+		if err != nil {
+			return errors.Wrapf(err, "Failed initializing BCCSP")
+		}
+	}
+	// GouMi BCCSP
+	if config.Default == "GM" && config.GM != nil {
+		f := &GMFactory{}
 		var err error
 		defaultBCCSP, err = initBCCSP(f, config)
 		if err != nil {
@@ -74,6 +84,8 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	switch config.Default {
 	case "SW":
 		f = &SWFactory{}
+	case "GM":
+		f = &GMFactory{}
 	default:
 		return nil, errors.Errorf("Could not find BCCSP, no '%s' provider", config.Default)
 	}

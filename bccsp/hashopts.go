@@ -1,18 +1,4 @@
-/*
-Copyright IBM Corp. 2016 All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-		 http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// SPDX-License-Identifier: Apache-2.0
 
 package bccsp
 
@@ -50,6 +36,14 @@ func (opts *SHA3_384Opts) Algorithm() string {
 	return SHA3_384
 }
 
+// SM3Opts contains options relating to SM3.
+type SM3Opts struct{}
+
+// Algorithm returns the hash algorithm identifier (to be used).
+func (opts *SM3Opts) Algorithm() string {
+	return SM3
+}
+
 // GetHashOpt returns the HashOpts corresponding to the passed hash function
 func GetHashOpt(hashFunction string) (HashOpts, error) {
 	switch hashFunction {
@@ -61,6 +55,8 @@ func GetHashOpt(hashFunction string) (HashOpts, error) {
 		return &SHA3_256Opts{}, nil
 	case SHA3_384:
 		return &SHA3_384Opts{}, nil
+	case SM3:
+		return &SM3Opts{}, nil
 	}
 	return nil, fmt.Errorf("hash function not recognized [%s]", hashFunction)
 }
