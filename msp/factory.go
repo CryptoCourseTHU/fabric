@@ -7,8 +7,6 @@ SPDX-License-Identifier: Apache-2.0
 package msp
 
 import (
-	"github.com/IBM/idemix"
-	"github.com/hyperledger/fabric/bccsp"
 	"github.com/pkg/errors"
 )
 
@@ -47,31 +45,29 @@ type IdemixNewOpts struct {
 }
 
 // New create a new MSP instance depending on the passed Opts
-func New(opts NewOpts, cryptoProvider bccsp.BCCSP) (MSP, error) {
+func New(opts NewOpts) (MSP, error) {
 	switch opts.(type) {
 	case *BCCSPNewOpts:
 		switch opts.GetVersion() {
-		case MSPv1_0, MSPv1_1, MSPv1_3, MSPv1_4_3:
-			return newBccspMsp(opts.GetVersion(), cryptoProvider)
+		case MSPv1_0:
+			return newBccspMsp(MSPv1_0)
+		case MSPv1_1:
+			return newBccspMsp(MSPv1_1)
+		case MSPv1_3:
+			return newBccspMsp(MSPv1_3)
+		case MSPv1_4_3:
+			return newBccspMsp(MSPv1_4_3)
 		default:
 			return nil, errors.Errorf("Invalid *BCCSPNewOpts. Version not recognized [%v]", opts.GetVersion())
 		}
 	case *IdemixNewOpts:
 		switch opts.GetVersion() {
-		case MSPv1_3, MSPv1_4_3:
-			msp, err := idemix.NewIdemixMsp(MSPv1_3)
-			if err != nil {
-				return nil, err
-			}
-
-			return &idemixMSPWrapper{msp.(*idemix.Idemixmsp)}, nil
+		case MSPv1_4_3:
+			fallthrough
+		case MSPv1_3:
+			return newIdemixMsp(MSPv1_3)
 		case MSPv1_1:
-			msp, err := idemix.NewIdemixMsp(MSPv1_1)
-			if err != nil {
-				return nil, err
-			}
-
-			return &idemixMSPWrapper{msp.(*idemix.Idemixmsp)}, nil
+			return newIdemixMsp(MSPv1_1)
 		default:
 			return nil, errors.Errorf("Invalid *IdemixNewOpts. Version not recognized [%v]", opts.GetVersion())
 		}
@@ -79,3 +75,4 @@ func New(opts NewOpts, cryptoProvider bccsp.BCCSP) (MSP, error) {
 		return nil, errors.Errorf("Invalid msp.NewOpts instance. It must be either *BCCSPNewOpts or *IdemixNewOpts. It was [%v]", opts)
 	}
 }
+

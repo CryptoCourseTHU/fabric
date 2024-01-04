@@ -10,91 +10,163 @@ import (
 	"bytes"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	m "github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/bccsp"
-	"github.com/hyperledger/fabric/bccsp/utils"
-	"github.com/pkg/errors"
+	m "github.com/hyperledger/fabric-protos-go/msp"
+	"github.com/tjfoc/gmsm/sm2"
+	errors "github.com/pkg/errors"
 )
 
 func (msp *bccspmsp) getCertifiersIdentifier(certRaw []byte) ([]byte, error) {
-	// 1. check that certificate is registered in msp.rootCerts or msp.intermediateCerts
-	cert, err := msp.getCertFromPem(certRaw)
-	if err != nil {
-		return nil, fmt.Errorf("Failed getting certificate for [%v]: [%s]", certRaw, err)
-	}
-
-	// 2. Sanitize it to ensure like for like comparison
-	cert, err = msp.sanitizeCert(cert)
-	if err != nil {
-		return nil, fmt.Errorf("sanitizeCert failed %s", err)
-	}
-
-	found := false
-	root := false
-	// Search among root certificates
-	for _, v := range msp.rootCerts {
-		if v.(*identity).cert.Equal(cert) {
-			found = true
-			root = true
-			break
+	if (false) {
+		// 1. check that certificate is registered in msp.rootCerts or msp.intermediateCerts
+		cert, err := msp.getCertFromPem(certRaw)
+		if err != nil {
+			return nil, fmt.Errorf("Failed getting certificate for [%v]: [%s]", certRaw, err)
 		}
-	}
-	if !found {
-		// Search among root intermediate certificates
-		for _, v := range msp.intermediateCerts {
-			if v.(*identity).cert.Equal(cert) {
+
+		// 2. Sanitize it to ensure like for like comparison
+		cert, err = msp.sanitizeCert(cert)
+		if err != nil {
+			return nil, fmt.Errorf("sanitizeCert failed %s", err)
+		}
+
+		found := false
+		root := false
+		// Search among root certificates
+		for _, v := range msp.rootCerts {
+			if v.(*identity).cert.(*x509.Certificate).Equal(cert.(*x509.Certificate)) {
 				found = true
+				root = true
 				break
 			}
 		}
-	}
-	if !found {
-		// Certificate not valid, reject configuration
-		return nil, fmt.Errorf("Failed adding OU. Certificate [%v] not in root or intermediate certs.", cert)
-	}
-
-	// 3. get the certification path for it
-	var certifiersIdentifier []byte
-	var chain []*x509.Certificate
-	if root {
-		chain = []*x509.Certificate{cert}
-	} else {
-		chain, err = msp.getValidationChain(cert, true)
-		if err != nil {
-			return nil, fmt.Errorf("Failed computing validation chain for [%v]. [%s]", cert, err)
+		if !found {
+			// Search among root intermediate certificates
+			for _, v := range msp.intermediateCerts {
+				if v.(*identity).cert.(*x509.Certificate).Equal(cert.(*x509.Certificate)) {
+					found = true
+					break
+				}
+			}
 		}
-	}
+		if !found {
+			// Certificate not valid, reject configuration
+			return nil, fmt.Errorf("Failed adding OU. Certificate [%v] not in root or intermediate certs.", cert)
+		}
 
-	// 4. compute the hash of the certification path
-	certifiersIdentifier, err = msp.getCertificationChainIdentifierFromChain(chain)
-	if err != nil {
-		return nil, fmt.Errorf("Failed computing Certifiers Identifier for [%v]. [%s]", certRaw, err)
-	}
+		// 3. get the certification path for it
+		var certifiersIdentifier []byte
+		var chain interface{}
+		if root {
+			chain = []*x509.Certificate{cert.(*x509.Certificate)}
+		} else {
+			chain, err = msp.getValidationChain(cert, true)
+			if err != nil {
+				return nil, fmt.Errorf("Failed computing validation chain for [%v]. [%s]", cert, err)
+			}
+		}
 
-	return certifiersIdentifier, nil
+		// 4. compute the hash of the certification path
+		certifiersIdentifier, err = msp.getCertificationChainIdentifierFromChain(chain)
+		if err != nil {
+			return nil, fmt.Errorf("Failed computing Certifiers Identifier for [%v]. [%s]", certRaw, err)
+		}
+
+		return certifiersIdentifier, nil
+	} else {
+		// 1. check that certificate is registered in msp.rootCerts or msp.intermediateCerts
+		cert, err := msp.getCertFromPem(certRaw)
+		if err != nil {
+			return nil, fmt.Errorf("Failed getting certificate for [%v]: [%s]", certRaw, err)
+		}
+
+		// 2. Sanitize it to ensure like for like comparison
+		cert, err = msp.sanitizeCert(cert)
+		if err != nil {
+			return nil, fmt.Errorf("sanitizeCert failed %s", err)
+		}
+
+		found := false
+		root := false
+		// Search among root certificates
+		for _, v := range msp.rootCerts {
+			if v.(*identity).cert.(*sm2.Certificate).Equal(cert.(*sm2.Certificate)) {
+				found = true
+				root = true
+				break
+			}
+		}
+		if !found {
+			// Search among root intermediate certificates
+			for _, v := range msp.intermediateCerts {
+				if v.(*identity).cert.(*sm2.Certificate).Equal(cert.(*sm2.Certificate)) {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			// Certificate not valid, reject configuration
+			return nil, fmt.Errorf("Failed adding OU. Certificate [%v] not in root or intermediate certs.", cert)
+		}
+
+		// 3. get the certification path for it
+		var certifiersIdentifier []byte
+		var chain interface{}
+		if root {
+			chain = []*sm2.Certificate{cert.(*sm2.Certificate)}
+		} else {
+			chain, err = msp.getValidationChain(cert, true)
+			if err != nil {
+				return nil, fmt.Errorf("Failed computing validation chain for [%v]. [%s]", cert, err)
+			}
+		}
+
+		// 4. compute the hash of the certification path
+		certifiersIdentifier, err = msp.getCertificationChainIdentifierFromChain(chain)
+		if err != nil {
+			return nil, fmt.Errorf("Failed computing Certifiers Identifier for [%v]. [%s]", certRaw, err)
+		}
+
+		return certifiersIdentifier, nil
+	}
 }
 
 func (msp *bccspmsp) setupCrypto(conf *m.FabricMSPConfig) error {
 	msp.cryptoConfig = conf.CryptoConfig
 	if msp.cryptoConfig == nil {
 		// Move to defaults
-		msp.cryptoConfig = &m.FabricCryptoConfig{
-			SignatureHashFamily:            bccsp.SHA2,
-			IdentityIdentifierHashFunction: bccsp.SHA256,
+		if (false) {
+			msp.cryptoConfig = &m.FabricCryptoConfig{
+				SignatureHashFamily:            bccsp.SHA2,
+				IdentityIdentifierHashFunction: bccsp.SHA256,
+			}
+		} else {
+			msp.cryptoConfig = &m.FabricCryptoConfig{
+				SignatureHashFamily:            bccsp.SM3,
+				IdentityIdentifierHashFunction: bccsp.SM3,
+			}
 		}
 		mspLogger.Debugf("CryptoConfig was nil. Move to defaults.")
 	}
 	if msp.cryptoConfig.SignatureHashFamily == "" {
-		msp.cryptoConfig.SignatureHashFamily = bccsp.SHA2
+		if (false) {
+			msp.cryptoConfig.SignatureHashFamily = bccsp.SHA2
+		} else {
+			msp.cryptoConfig.SignatureHashFamily = bccsp.SM3
+		}
 		mspLogger.Debugf("CryptoConfig.SignatureHashFamily was nil. Move to defaults.")
 	}
 	if msp.cryptoConfig.IdentityIdentifierHashFunction == "" {
-		msp.cryptoConfig.IdentityIdentifierHashFunction = bccsp.SHA256
+		if (false) {
+			msp.cryptoConfig.IdentityIdentifierHashFunction = bccsp.SHA256
+		} else {
+			msp.cryptoConfig.IdentityIdentifierHashFunction = bccsp.SM3
+		}
 		mspLogger.Debugf("CryptoConfig.IdentityIdentifierHashFunction was nil. Move to defaults.")
 	}
 
@@ -112,20 +184,38 @@ func (msp *bccspmsp) setupCAs(conf *m.FabricMSPConfig) error {
 	// Recall that sanitization is applied also to root CA and intermediate
 	// CA certificates. After their sanitization is done, the opts
 	// will be recreated using the sanitized certs.
-	msp.opts = &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()}
-	for _, v := range conf.RootCerts {
-		cert, err := msp.getCertFromPem(v)
-		if err != nil {
-			return err
+	if (false) {
+		msp.opts = &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()}
+		for _, v := range conf.RootCerts {
+			cert, err := msp.getCertFromPem(v)
+			if err != nil {
+				return err
+			}
+			msp.opts.(*x509.VerifyOptions).Roots.AddCert(cert.(*x509.Certificate))
 		}
-		msp.opts.Roots.AddCert(cert)
-	}
-	for _, v := range conf.IntermediateCerts {
-		cert, err := msp.getCertFromPem(v)
-		if err != nil {
-			return err
+		for _, v := range conf.IntermediateCerts {
+			cert, err := msp.getCertFromPem(v)
+			if err != nil {
+				return err
+			}
+			msp.opts.(*x509.VerifyOptions).Intermediates.AddCert(cert.(*x509.Certificate))
 		}
-		msp.opts.Intermediates.AddCert(cert)
+	} else {
+		msp.opts = &sm2.VerifyOptions{Roots: sm2.NewCertPool(), Intermediates: sm2.NewCertPool()}
+		for _, v := range conf.RootCerts {
+			cert, err := msp.getCertFromPem(v)
+			if err != nil {
+				return err
+			}
+			msp.opts.(*sm2.VerifyOptions).Roots.AddCert(cert.(*sm2.Certificate))
+		}
+		for _, v := range conf.IntermediateCerts {
+			cert, err := msp.getCertFromPem(v)
+			if err != nil {
+				return err
+			}
+			msp.opts.(*sm2.VerifyOptions).Intermediates.AddCert(cert.(*sm2.Certificate))
+		}
 	}
 
 	// Load root and intermediate CA identities
@@ -151,13 +241,23 @@ func (msp *bccspmsp) setupCAs(conf *m.FabricMSPConfig) error {
 		msp.intermediateCerts[i] = id
 	}
 
-	// root CA and intermediate CA certificates are sanitized, they can be re-imported
-	msp.opts = &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()}
-	for _, id := range msp.rootCerts {
-		msp.opts.Roots.AddCert(id.(*identity).cert)
-	}
-	for _, id := range msp.intermediateCerts {
-		msp.opts.Intermediates.AddCert(id.(*identity).cert)
+	// root CA and intermediate CA certificates are sanitized, they can be reimported
+	if (false) {
+		msp.opts = &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()}
+		for _, id := range msp.rootCerts {
+			msp.opts.(*x509.VerifyOptions).Roots.AddCert(id.(*identity).cert.(*x509.Certificate))
+		}
+		for _, id := range msp.intermediateCerts {
+			msp.opts.(*x509.VerifyOptions).Intermediates.AddCert(id.(*identity).cert.(*x509.Certificate))
+		}
+	} else {
+		msp.opts = &sm2.VerifyOptions{Roots: sm2.NewCertPool(), Intermediates: sm2.NewCertPool()}
+		for _, id := range msp.rootCerts {
+			msp.opts.(*sm2.VerifyOptions).Roots.AddCert(id.(*identity).cert.(*sm2.Certificate))
+		}
+		for _, id := range msp.intermediateCerts {
+			msp.opts.(*sm2.VerifyOptions).Intermediates.AddCert(id.(*identity).cert.(*sm2.Certificate))
+		}
 	}
 
 	return nil
@@ -167,7 +267,7 @@ func (msp *bccspmsp) setupAdmins(conf *m.FabricMSPConfig) error {
 	return msp.internalSetupAdmin(conf)
 }
 
-func (msp *bccspmsp) setupAdminsPreV142(conf *m.FabricMSPConfig) error {
+func (msp *bccspmsp) setupAdminsPreV143(conf *m.FabricMSPConfig) error {
 	// make and fill the set of admin certs (if present)
 	msp.admins = make([]Identity, len(conf.Admins))
 	for i, admCert := range conf.Admins {
@@ -182,9 +282,9 @@ func (msp *bccspmsp) setupAdminsPreV142(conf *m.FabricMSPConfig) error {
 	return nil
 }
 
-func (msp *bccspmsp) setupAdminsV142(conf *m.FabricMSPConfig) error {
+func (msp *bccspmsp) setupAdminsV143(conf *m.FabricMSPConfig) error {
 	// make and fill the set of admin certs (if present)
-	if err := msp.setupAdminsPreV142(conf); err != nil {
+	if err := msp.setupAdminsPreV143(conf); err != nil {
 		return err
 	}
 
@@ -195,83 +295,100 @@ func (msp *bccspmsp) setupAdminsV142(conf *m.FabricMSPConfig) error {
 	return nil
 }
 
-func isECDSASignatureAlgorithm(algid asn1.ObjectIdentifier) bool {
-	// This is the set of ECDSA algorithms supported by Go 1.14 for CRL
-	// signatures.
-	ecdsaSignaureAlgorithms := []asn1.ObjectIdentifier{
-		{1, 2, 840, 10045, 4, 1},    // oidSignatureECDSAWithSHA1
-		{1, 2, 840, 10045, 4, 3, 2}, // oidSignatureECDSAWithSHA256
-		{1, 2, 840, 10045, 4, 3, 3}, // oidSignatureECDSAWithSHA384
-		{1, 2, 840, 10045, 4, 3, 4}, // oidSignatureECDSAWithSHA512
-	}
-	for _, id := range ecdsaSignaureAlgorithms {
-		if id.Equal(algid) {
-			return true
-		}
-	}
-	return false
-}
-
 func (msp *bccspmsp) setupCRLs(conf *m.FabricMSPConfig) error {
 	// setup the CRL (if present)
 	msp.CRL = make([]*pkix.CertificateList, len(conf.RevocationList))
-	for i, crlbytes := range conf.RevocationList {
-		crl, err := x509.ParseCRL(crlbytes)
-		if err != nil {
-			return errors.Wrap(err, "could not parse RevocationList")
-		}
-
-		// Massage the ECDSA signature values
-		if isECDSASignatureAlgorithm(crl.SignatureAlgorithm.Algorithm) {
-			r, s, err := utils.UnmarshalECDSASignature(crl.SignatureValue.RightAlign())
+	if (false) {
+		for i, crlbytes := range conf.RevocationList {
+			crl, err := x509.ParseCRL(crlbytes)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "could not parse RevocationList")
 			}
-			sig, err := utils.MarshalECDSASignature(r, s)
-			if err != nil {
-				return err
-			}
-			crl.SignatureValue = asn1.BitString{Bytes: sig, BitLength: 8 * len(sig)}
+
+			// TODO: pre-verify the signature on the CRL and create a map
+			//       of CA certs to respective CRLs so that later upon
+			//       validation we can already look up the CRL given the
+			//       chain of the certificate to be validated
+
+			msp.CRL[i] = crl
 		}
+	} else {
+		for i, crlbytes := range conf.RevocationList {
+			crl, err := sm2.ParseCRL(crlbytes)
+			if err != nil {
+				return errors.Wrap(err, "could not parse RevocationList")
+			}
 
-		// TODO: pre-verify the signature on the CRL and create a map
-		//       of CA certs to respective CRLs so that later upon
-		//       validation we can already look up the CRL given the
-		//       chain of the certificate to be validated
+			// TODO: pre-verify the signature on the CRL and create a map
+			//       of CA certs to respective CRLs so that later upon
+			//       validation we can already look up the CRL given the
+			//       chain of the certificate to be validated
 
-		msp.CRL[i] = crl
+			msp.CRL[i] = crl
+		}
 	}
 
 	return nil
 }
 
 func (msp *bccspmsp) finalizeSetupCAs() error {
-	// ensure that our CAs are properly formed and that they are valid
-	for _, id := range append(append([]Identity{}, msp.rootCerts...), msp.intermediateCerts...) {
-		if !id.(*identity).cert.IsCA {
-			return errors.Errorf("CA Certificate did not have the CA attribute, (SN: %x)", id.(*identity).cert.SerialNumber)
-		}
-		if _, err := getSubjectKeyIdentifierFromCert(id.(*identity).cert); err != nil {
-			return errors.WithMessagef(err, "CA Certificate problem with Subject Key Identifier extension, (SN: %x)", id.(*identity).cert.SerialNumber)
+	if (false) {
+		// ensure that our CAs are properly formed and that they are valid
+		for _, id := range append(append([]Identity{}, msp.rootCerts...), msp.intermediateCerts...) {
+			if !id.(*identity).cert.(*x509.Certificate).IsCA {
+				return errors.Errorf("CA Certificate did not have the CA attribute, (SN: %x)", id.(*identity).cert.(*x509.Certificate).SerialNumber)
+			}
+			if _, err := getSubjectKeyIdentifierFromCert(id.(*identity).cert); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate problem with Subject Key Identifier extension, (SN: %x)", id.(*identity).cert.(*x509.Certificate).SerialNumber))
+			}
+
+			if err := msp.validateCAIdentity(id.(*identity)); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate is not valid, (SN: %s)", id.(*identity).cert.(*x509.Certificate).SerialNumber))
+			}
 		}
 
-		if err := msp.validateCAIdentity(id.(*identity)); err != nil {
-			return errors.WithMessagef(err, "CA Certificate is not valid, (SN: %s)", id.(*identity).cert.SerialNumber)
-		}
-	}
+		// populate certificationTreeInternalNodesMap to mark the internal nodes of the
+		// certification tree
+		msp.certificationTreeInternalNodesMap = make(map[string]bool)
+		for _, id := range append([]Identity{}, msp.intermediateCerts...) {
+			chain, err := msp.getUniqueValidationChain(id.(*identity).cert, msp.getValidityOptsForCert(id.(*identity).cert))
+			if err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("failed getting validation chain, (SN: %s)", id.(*identity).cert.(*x509.Certificate).SerialNumber))
+			}
 
-	// populate certificationTreeInternalNodesMap to mark the internal nodes of the
-	// certification tree
-	msp.certificationTreeInternalNodesMap = make(map[string]bool)
-	for _, id := range append([]Identity{}, msp.intermediateCerts...) {
-		chain, err := msp.getUniqueValidationChain(id.(*identity).cert, msp.getValidityOptsForCert(id.(*identity).cert))
-		if err != nil {
-			return errors.WithMessagef(err, "failed getting validation chain, (SN: %s)", id.(*identity).cert.SerialNumber)
+			// Recall chain[0] is id.(*identity).id so it does not count as a parent
+			for i := 1; i < len(chain.([]*x509.Certificate)); i++ {
+				msp.certificationTreeInternalNodesMap[string(chain.([]*x509.Certificate)[i].Raw)] = true
+			}
+		}
+	} else {
+		// ensure that our CAs are properly formed and that they are valid
+		for _, id := range append(append([]Identity{}, msp.rootCerts...), msp.intermediateCerts...) {
+			if !id.(*identity).cert.(*sm2.Certificate).IsCA {
+				return errors.Errorf("CA Certificate did not have the CA attribute, (SN: %x)", id.(*identity).cert.(*sm2.Certificate).SerialNumber)
+			}
+			if _, err := getSubjectKeyIdentifierFromCert(id.(*identity).cert); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate problem with Subject Key Identifier extension, (SN: %x)", id.(*identity).cert.(*sm2.Certificate).SerialNumber))
+			}
+
+			if err := msp.validateCAIdentity(id.(*identity)); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate is not valid, (SN: %s)", id.(*identity).cert.(*sm2.Certificate).SerialNumber))
+			}
 		}
 
-		// Recall chain[0] is id.(*identity).id so it does not count as a parent
-		for i := 1; i < len(chain); i++ {
-			msp.certificationTreeInternalNodesMap[string(chain[i].Raw)] = true
+		// populate certificationTreeInternalNodesMap to mark the internal nodes of the
+		// certification tree
+		msp.certificationTreeInternalNodesMap = make(map[string]bool)
+		for _, id := range append([]Identity{}, msp.intermediateCerts...) {
+			chain, err := msp.getUniqueValidationChain(id.(*identity).cert, msp.getValidityOptsForCert(id.(*identity).cert))
+			if err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("failed getting validation chain, (SN: %s)", id.(*identity).cert.(*sm2.Certificate).SerialNumber))
+			}
+
+			// Recall chain[0] is id.(*identity).id so it does not count as a parent
+			for i := 1; i < len(chain.([]*sm2.Certificate)); i++ {
+				msp.certificationTreeInternalNodesMap[string(chain.([]*sm2.Certificate)[i].Raw)] = true
+			}
 		}
 	}
 
@@ -318,7 +435,7 @@ func (msp *bccspmsp) setupNodeOUs(config *m.FabricMSPConfig) error {
 	return nil
 }
 
-func (msp *bccspmsp) setupNodeOUsV142(config *m.FabricMSPConfig) error {
+func (msp *bccspmsp) setupNodeOUsV143(config *m.FabricMSPConfig) error {
 	if config.FabricNodeOus == nil {
 		msp.ouEnforcement = false
 		return nil
@@ -424,7 +541,7 @@ func (msp *bccspmsp) setupOUs(conf *m.FabricMSPConfig) error {
 
 		certifiersIdentifier, err := msp.getCertifiersIdentifier(ou.Certificate)
 		if err != nil {
-			return errors.WithMessagef(err, "failed getting certificate for [%v]", ou)
+			return errors.WithMessage(err, fmt.Sprintf("failed getting certificate for [%v]", ou))
 		}
 
 		// Check for duplicates
@@ -450,52 +567,101 @@ func (msp *bccspmsp) setupOUs(conf *m.FabricMSPConfig) error {
 }
 
 func (msp *bccspmsp) setupTLSCAs(conf *m.FabricMSPConfig) error {
-	opts := &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()}
+	if (false) {
+		opts := &x509.VerifyOptions{Roots: x509.NewCertPool(), Intermediates: x509.NewCertPool()}
 
-	// Load TLS root and intermediate CA identities
-	msp.tlsRootCerts = make([][]byte, len(conf.TlsRootCerts))
-	rootCerts := make([]*x509.Certificate, len(conf.TlsRootCerts))
-	for i, trustedCert := range conf.TlsRootCerts {
-		cert, err := msp.getCertFromPem(trustedCert)
-		if err != nil {
-			return err
+		// Load TLS root and intermediate CA identities
+		msp.tlsRootCerts = make([][]byte, len(conf.TlsRootCerts))
+		rootCerts := make([]*x509.Certificate, len(conf.TlsRootCerts))
+		for i, trustedCert := range conf.TlsRootCerts {
+			cert, err := msp.getCertFromPem(trustedCert)
+			if err != nil {
+				return err
+			}
+
+			rootCerts[i] = cert.(*x509.Certificate)
+			msp.tlsRootCerts[i] = trustedCert
+			opts.Roots.AddCert(cert.(*x509.Certificate))
 		}
 
-		rootCerts[i] = cert
-		msp.tlsRootCerts[i] = trustedCert
-		opts.Roots.AddCert(cert)
-	}
+		// make and fill the set of intermediate certs (if present)
+		msp.tlsIntermediateCerts = make([][]byte, len(conf.TlsIntermediateCerts))
+		intermediateCerts := make([]*x509.Certificate, len(conf.TlsIntermediateCerts))
+		for i, trustedCert := range conf.TlsIntermediateCerts {
+			cert, err := msp.getCertFromPem(trustedCert)
+			if err != nil {
+				return err
+			}
 
-	// make and fill the set of intermediate certs (if present)
-	msp.tlsIntermediateCerts = make([][]byte, len(conf.TlsIntermediateCerts))
-	intermediateCerts := make([]*x509.Certificate, len(conf.TlsIntermediateCerts))
-	for i, trustedCert := range conf.TlsIntermediateCerts {
-		cert, err := msp.getCertFromPem(trustedCert)
-		if err != nil {
-			return err
+			intermediateCerts[i] = cert.(*x509.Certificate)
+			msp.tlsIntermediateCerts[i] = trustedCert
+			opts.Intermediates.AddCert(cert.(*x509.Certificate))
 		}
 
-		intermediateCerts[i] = cert
-		msp.tlsIntermediateCerts[i] = trustedCert
-		opts.Intermediates.AddCert(cert)
-	}
+		// ensure that our CAs are properly formed and that they are valid
+		for _, cert := range append(append([]*x509.Certificate{}, rootCerts...), intermediateCerts...) {
+			if cert == nil {
+				continue
+			}
 
-	// ensure that our CAs are properly formed and that they are valid
-	for _, cert := range append(append([]*x509.Certificate{}, rootCerts...), intermediateCerts...) {
-		if cert == nil {
-			continue
+			if !cert.IsCA {
+				return errors.Errorf("CA Certificate did not have the CA attribute, (SN: %x)", cert.SerialNumber)
+			}
+			if _, err := getSubjectKeyIdentifierFromCert(cert); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate problem with Subject Key Identifier extension, (SN: %x)", cert.SerialNumber))
+			}
+
+			if err := msp.validateTLSCAIdentity(cert, opts); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate is not valid, (SN: %s)", cert.SerialNumber))
+			}
+		}
+	} else {
+		opts := &sm2.VerifyOptions{Roots: sm2.NewCertPool(), Intermediates: sm2.NewCertPool()}
+
+		// Load TLS root and intermediate CA identities
+		msp.tlsRootCerts = make([][]byte, len(conf.TlsRootCerts))
+		rootCerts := make([]*sm2.Certificate, len(conf.TlsRootCerts))
+		for i, trustedCert := range conf.TlsRootCerts {
+			cert, err := msp.getCertFromPem(trustedCert)
+			if err != nil {
+				return err
+			}
+
+			rootCerts[i] = cert.(*sm2.Certificate)
+			msp.tlsRootCerts[i] = trustedCert
+			opts.Roots.AddCert(cert.(*sm2.Certificate))
 		}
 
-		if !cert.IsCA {
-			return errors.Errorf("CA Certificate did not have the CA attribute, (SN: %x)", cert.SerialNumber)
-		}
-		if _, err := getSubjectKeyIdentifierFromCert(cert); err != nil {
-			return errors.WithMessagef(err, "CA Certificate problem with Subject Key Identifier extension, (SN: %x)", cert.SerialNumber)
+		// make and fill the set of intermediate certs (if present)
+		msp.tlsIntermediateCerts = make([][]byte, len(conf.TlsIntermediateCerts))
+		intermediateCerts := make([]*sm2.Certificate, len(conf.TlsIntermediateCerts))
+		for i, trustedCert := range conf.TlsIntermediateCerts {
+			cert, err := msp.getCertFromPem(trustedCert)
+			if err != nil {
+				return err
+			}
+
+			intermediateCerts[i] = cert.(*sm2.Certificate)
+			msp.tlsIntermediateCerts[i] = trustedCert
+			opts.Intermediates.AddCert(cert.(*sm2.Certificate))
 		}
 
-		opts.CurrentTime = cert.NotBefore.Add(time.Second)
-		if err := msp.validateTLSCAIdentity(cert, opts); err != nil {
-			return errors.WithMessagef(err, "CA Certificate is not valid, (SN: %s)", cert.SerialNumber)
+		// ensure that our CAs are properly formed and that they are valid
+		for _, cert := range append(append([]*sm2.Certificate{}, rootCerts...), intermediateCerts...) {
+			if cert == nil {
+				continue
+			}
+
+			if !cert.IsCA {
+				return errors.Errorf("CA Certificate did not have the CA attribute, (SN: %x)", cert.SerialNumber)
+			}
+			if _, err := getSubjectKeyIdentifierFromCert(cert); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate problem with Subject Key Identifier extension, (SN: %x)", cert.SerialNumber))
+			}
+
+			if err := msp.validateTLSCAIdentity(cert, opts); err != nil {
+				return errors.WithMessage(err, fmt.Sprintf("CA Certificate is not valid, (SN: %s)", cert.SerialNumber))
+			}
 		}
 	}
 
@@ -560,7 +726,7 @@ func (msp *bccspmsp) preSetupV1(conf *m.FabricMSPConfig) error {
 	return nil
 }
 
-func (msp *bccspmsp) preSetupV142(conf *m.FabricMSPConfig) error {
+func (msp *bccspmsp) preSetupV143(conf *m.FabricMSPConfig) error {
 	// setup crypto config
 	if err := msp.setupCrypto(conf); err != nil {
 		return err
@@ -597,7 +763,7 @@ func (msp *bccspmsp) preSetupV142(conf *m.FabricMSPConfig) error {
 	}
 
 	// setup NodeOUs
-	if err := msp.setupNodeOUsV142(conf); err != nil {
+	if err := msp.setupNodeOUsV143(conf); err != nil {
 		return err
 	}
 
@@ -616,7 +782,7 @@ func (msp *bccspmsp) postSetupV1(conf *m.FabricMSPConfig) error {
 	for i, admin := range msp.admins {
 		err := admin.Validate()
 		if err != nil {
-			return errors.WithMessagef(err, "admin %d is invalid", i)
+			return errors.WithMessage(err, fmt.Sprintf("admin %d is invalid", i))
 		}
 	}
 
@@ -642,13 +808,13 @@ func (msp *bccspmsp) setupV11(conf *m.FabricMSPConfig) error {
 	return nil
 }
 
-func (msp *bccspmsp) setupV142(conf *m.FabricMSPConfig) error {
-	err := msp.preSetupV142(conf)
+func (msp *bccspmsp) setupV143(conf *m.FabricMSPConfig) error {
+	err := msp.preSetupV143(conf)
 	if err != nil {
 		return err
 	}
 
-	err = msp.postSetupV142(conf)
+	err = msp.postSetupV143(conf)
 	if err != nil {
 		return err
 	}
@@ -670,19 +836,18 @@ func (msp *bccspmsp) postSetupV11(conf *m.FabricMSPConfig) error {
 	}
 	principal := &m.MSPPrincipal{
 		PrincipalClassification: m.MSPPrincipal_ROLE,
-		Principal:               principalBytes,
-	}
+		Principal:               principalBytes}
 	for i, admin := range msp.admins {
 		err = admin.SatisfiesPrincipal(principal)
 		if err != nil {
-			return errors.WithMessagef(err, "admin %d is invalid", i)
+			return errors.WithMessage(err, fmt.Sprintf("admin %d is invalid", i))
 		}
 	}
 
 	return nil
 }
 
-func (msp *bccspmsp) postSetupV142(conf *m.FabricMSPConfig) error {
+func (msp *bccspmsp) postSetupV143(conf *m.FabricMSPConfig) error {
 	// Check for OU enforcement
 	if !msp.ouEnforcement {
 		// No enforcement required. Call post setup as per V1
@@ -700,3 +865,4 @@ func (msp *bccspmsp) postSetupV142(conf *m.FabricMSPConfig) error {
 
 	return nil
 }
+

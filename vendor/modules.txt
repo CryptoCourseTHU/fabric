@@ -414,11 +414,15 @@ github.com/syndtr/goleveldb/leveldb/util
 github.com/tedsuo/ifrit
 github.com/tedsuo/ifrit/ginkgomon_v2
 github.com/tedsuo/ifrit/grouper
-# github.com/tjfoc/gmsm v1.0.2-0.20190307020335-909fbd1753df
-## explicit
+# github.com/tjfoc/gmsm v1.2.3
+## explicit; go 1.12
 github.com/tjfoc/gmsm/sm2
 github.com/tjfoc/gmsm/sm3
 github.com/tjfoc/gmsm/sm4
+# github.com/tjfoc/gmtls v1.2.1
+## explicit; go 1.12
+github.com/tjfoc/gmtls
+github.com/tjfoc/gmtls/gmcredentials
 # go.etcd.io/etcd/client/pkg/v3 v3.5.9
 ## explicit; go 1.19
 go.etcd.io/etcd/client/pkg/v3/fileutil
@@ -460,6 +464,12 @@ go.uber.org/zap/zapgrpc
 go.uber.org/zap/zaptest/observer
 # golang.org/x/crypto v0.14.0
 ## explicit; go 1.17
+golang.org/x/crypto/chacha20
+golang.org/x/crypto/chacha20poly1305
+golang.org/x/crypto/curve25519
+golang.org/x/crypto/curve25519/internal/field
+golang.org/x/crypto/internal/alias
+golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/ripemd160
 golang.org/x/crypto/sha3
 # golang.org/x/mod v0.8.0
@@ -467,6 +477,7 @@ golang.org/x/crypto/sha3
 golang.org/x/mod/semver
 # golang.org/x/net v0.17.0
 ## explicit; go 1.17
+golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset

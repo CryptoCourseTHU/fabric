@@ -14,126 +14,193 @@ import (
 	"math/big"
 	"reflect"
 	"time"
-
+	"github.com/tjfoc/gmsm/sm2"
 	"github.com/pkg/errors"
 )
 
 func (msp *bccspmsp) validateIdentity(id *identity) error {
-	id.validationMutex.Lock()
-	defer id.validationMutex.Unlock()
-
-	// return cached validation value if already validated
-	if id.validated {
-		return id.validationErr
-	}
-
-	id.validated = true
-
 	validationChain, err := msp.getCertificationChainForBCCSPIdentity(id)
 	if err != nil {
-		id.validationErr = errors.WithMessage(err, "could not obtain certification chain")
-		mspLogger.Warnf("Could not validate identity: %s (certificate subject=%s issuer=%s serialnumber=%d)", id.validationErr, id.cert.Subject, id.cert.Issuer, id.cert.SerialNumber)
-		return id.validationErr
+		return errors.WithMessage(err, "could not obtain certification chain")
 	}
 
 	err = msp.validateIdentityAgainstChain(id, validationChain)
 	if err != nil {
-		id.validationErr = errors.WithMessage(err, "could not validate identity against certification chain")
-		mspLogger.Warnf("Could not validate identity: %s (certificate subject=%s issuer=%s serialnumber=%d)", id.validationErr, id.cert.Subject, id.cert.Issuer, id.cert.SerialNumber)
-		return id.validationErr
+		return errors.WithMessage(err, "could not validate identity against certification chain")
 	}
 
 	err = msp.internalValidateIdentityOusFunc(id)
 	if err != nil {
-		id.validationErr = errors.WithMessage(err, "could not validate identity's OUs")
-		mspLogger.Warnf("Could not validate identity: %s (certificate subject=%s issuer=%s serialnumber=%d)", id.validationErr, id.cert.Subject, id.cert.Issuer, id.cert.SerialNumber)
-		return id.validationErr
+		return errors.WithMessage(err, "could not validate identity's OUs")
 	}
 
 	return nil
 }
 
 func (msp *bccspmsp) validateCAIdentity(id *identity) error {
-	if !id.cert.IsCA {
-		return errors.New("Only CA identities can be validated")
-	}
+	if (false) {
+		if !id.cert.(*x509.Certificate).IsCA {
+			return errors.New("Only CA identities can be validated")
+		}
 
-	validationChain, err := msp.getUniqueValidationChain(id.cert, msp.getValidityOptsForCert(id.cert))
-	if err != nil {
-		return errors.WithMessage(err, "could not obtain certification chain")
-	}
-	if len(validationChain) == 1 {
-		// validationChain[0] is the root CA certificate
-		return nil
-	}
+		validationChain, err := msp.getUniqueValidationChain(id.cert, msp.getValidityOptsForCert(id.cert))
+		if err != nil {
+			return errors.WithMessage(err, "could not obtain certification chain")
+		}
+		if len(validationChain.([]*x509.Certificate)) == 1 {
+			// validationChain[0] is the root CA certificate
+			return nil
+		}
 
-	return msp.validateIdentityAgainstChain(id, validationChain)
+		return msp.validateIdentityAgainstChain(id, validationChain)
+	} else {
+		if !id.cert.(*sm2.Certificate).IsCA {
+			return errors.New("Only CA identities can be validated")
+		}
+
+		validationChain, err := msp.getUniqueValidationChain(id.cert, msp.getValidityOptsForCert(id.cert))
+		if err != nil {
+			return errors.WithMessage(err, "could not obtain certification chain")
+		}
+		if len(validationChain.([]*sm2.Certificate)) == 1 {
+			// validationChain[0] is the root CA certificate
+			return nil
+		}
+
+		return msp.validateIdentityAgainstChain(id, validationChain)
+	}
 }
 
-func (msp *bccspmsp) validateTLSCAIdentity(cert *x509.Certificate, opts *x509.VerifyOptions) error {
-	if !cert.IsCA {
-		return errors.New("Only CA identities can be validated")
-	}
+func (msp *bccspmsp) validateTLSCAIdentity(cert interface{}, optsInterface interface{}) error {
+	if (false) {
+		opts := optsInterface.(*x509.VerifyOptions)
+		if !cert.(*x509.Certificate).IsCA {
+			return errors.New("Only CA identities can be validated")
+		}
 
-	validationChain, err := msp.getUniqueValidationChain(cert, *opts)
-	if err != nil {
-		return errors.WithMessage(err, "could not obtain certification chain")
-	}
-	if len(validationChain) == 1 {
-		// validationChain[0] is the root CA certificate
-		return nil
-	}
+		validationChain, err := msp.getUniqueValidationChain(cert, *opts)
+		if err != nil {
+			return errors.WithMessage(err, "could not obtain certification chain")
+		}
+		if len(validationChain.([]*x509.Certificate)) == 1 {
+			// validationChain[0] is the root CA certificate
+			return nil
+		}
 
-	return msp.validateCertAgainstChain(cert, validationChain)
+		return msp.validateCertAgainstChain(cert, validationChain)
+	} else {
+		opts := optsInterface.(*sm2.VerifyOptions)
+		if !cert.(*sm2.Certificate).IsCA {
+			return errors.New("Only CA identities can be validated")
+		}
+
+		validationChain, err := msp.getUniqueValidationChain(cert, *opts)
+		if err != nil {
+			return errors.WithMessage(err, "could not obtain certification chain")
+		}
+		if len(validationChain.([]*sm2.Certificate)) == 1 {
+			// validationChain[0] is the root CA certificate
+			return nil
+		}
+
+		return msp.validateCertAgainstChain(cert, validationChain)
+	}
 }
 
-func (msp *bccspmsp) validateIdentityAgainstChain(id *identity, validationChain []*x509.Certificate) error {
+func (msp *bccspmsp) validateIdentityAgainstChain(id *identity, validationChain interface{}) error {
 	return msp.validateCertAgainstChain(id.cert, validationChain)
 }
 
-func (msp *bccspmsp) validateCertAgainstChain(cert *x509.Certificate, validationChain []*x509.Certificate) error {
+func (msp *bccspmsp) validateCertAgainstChain(cert interface{}, validationChain interface{}) error {
 	// here we know that the identity is valid; now we have to check whether it has been revoked
 
-	// identify the SKI of the CA that signed this cert
-	SKI, err := getSubjectKeyIdentifierFromCert(validationChain[1])
-	if err != nil {
-		return errors.WithMessage(err, "could not obtain Subject Key Identifier for signer cert")
-	}
-
-	// check whether one of the CRLs we have has this cert's
-	// SKI as its AuthorityKeyIdentifier
-	for _, crl := range msp.CRL {
-		aki, err := getAuthorityKeyIdentifierFromCrl(crl)
+	if (false) {
+		// identify the SKI of the CA that signed this cert
+		SKI, err := getSubjectKeyIdentifierFromCert(validationChain.([]*x509.Certificate)[1])
 		if err != nil {
-			return errors.WithMessage(err, "could not obtain Authority Key Identifier for crl")
+			return errors.WithMessage(err, "could not obtain Subject Key Identifier for signer cert")
 		}
 
-		// check if the SKI of the cert that signed us matches the AKI of any of the CRLs
-		if bytes.Equal(aki, SKI) {
-			// we have a CRL, check whether the serial number is revoked
-			for _, rc := range crl.TBSCertList.RevokedCertificates {
-				if rc.SerialNumber.Cmp(cert.SerialNumber) == 0 {
-					// We have found a CRL whose AKI matches the SKI of
-					// the CA (root or intermediate) that signed the
-					// certificate that is under validation. As a
-					// precaution, we verify that said CA is also the
-					// signer of this CRL.
-					err = validationChain[1].CheckCRLSignature(crl)
-					if err != nil {
-						// the CA cert that signed the certificate
-						// that is under validation did not sign the
-						// candidate CRL - skip
-						mspLogger.Warningf("Invalid signature over the identified CRL, error %+v", err)
-						continue
-					}
+		// check whether one of the CRLs we have has this cert's
+		// SKI as its AuthorityKeyIdentifier
+		for _, crl := range msp.CRL {
+			aki, err := getAuthorityKeyIdentifierFromCrl(crl)
+			if err != nil {
+				return errors.WithMessage(err, "could not obtain Authority Key Identifier for crl")
+			}
 
-					// A CRL also includes a time of revocation so that
-					// the CA can say "this cert is to be revoked starting
-					// from this time"; however here we just assume that
-					// revocation applies instantaneously from the time
-					// the MSP config is committed and used so we will not
-					// make use of that field
-					return errors.New("The certificate has been revoked")
+			// check if the SKI of the cert that signed us matches the AKI of any of the CRLs
+			if bytes.Equal(aki, SKI) {
+				// we have a CRL, check whether the serial number is revoked
+				for _, rc := range crl.TBSCertList.RevokedCertificates {
+					if rc.SerialNumber.Cmp(cert.(*x509.Certificate).SerialNumber) == 0 {
+						// We have found a CRL whose AKI matches the SKI of
+						// the CA (root or intermediate) that signed the
+						// certificate that is under validation. As a
+						// precaution, we verify that said CA is also the
+						// signer of this CRL.
+						err = validationChain.([]*x509.Certificate)[1].CheckCRLSignature(crl)
+						if err != nil {
+							// the CA cert that signed the certificate
+							// that is under validation did not sign the
+							// candidate CRL - skip
+							mspLogger.Warningf("Invalid signature over the identified CRL, error %+v", err)
+							continue
+						}
+
+						// A CRL also includes a time of revocation so that
+						// the CA can say "this cert is to be revoked starting
+						// from this time"; however here we just assume that
+						// revocation applies instantaneously from the time
+						// the MSP config is committed and used so we will not
+						// make use of that field
+						return errors.New("The certificate has been revoked")
+					}
+				}
+			}
+		}
+	} else {
+		// identify the SKI of the CA that signed this cert
+		SKI, err := getSubjectKeyIdentifierFromCert(validationChain.([]*sm2.Certificate)[1])
+		if err != nil {
+			return errors.WithMessage(err, "could not obtain Subject Key Identifier for signer cert")
+		}
+
+		// check whether one of the CRLs we have has this cert's
+		// SKI as its AuthorityKeyIdentifier
+		for _, crl := range msp.CRL {
+			aki, err := getAuthorityKeyIdentifierFromCrl(crl)
+			if err != nil {
+				return errors.WithMessage(err, "could not obtain Authority Key Identifier for crl")
+			}
+
+			// check if the SKI of the cert that signed us matches the AKI of any of the CRLs
+			if bytes.Equal(aki, SKI) {
+				// we have a CRL, check whether the serial number is revoked
+				for _, rc := range crl.TBSCertList.RevokedCertificates {
+					if rc.SerialNumber.Cmp(cert.(*sm2.Certificate).SerialNumber) == 0 {
+						// We have found a CRL whose AKI matches the SKI of
+						// the CA (root or intermediate) that signed the
+						// certificate that is under validation. As a
+						// precaution, we verify that said CA is also the
+						// signer of this CRL.
+						err = validationChain.([]*sm2.Certificate)[1].CheckCRLSignature(crl)
+						if err != nil {
+							// the CA cert that signed the certificate
+							// that is under validation did not sign the
+							// candidate CRL - skip
+							mspLogger.Warningf("Invalid signature over the identified CRL, error %+v", err)
+							continue
+						}
+
+						// A CRL also includes a time of revocation so that
+						// the CA can say "this cert is to be revoked starting
+						// from this time"; however here we just assume that
+						// revocation applies instantaneously from the time
+						// the MSP config is committed and used so we will not
+						// make use of that field
+						return errors.New("The certificate has been revoked")
+					}
 				}
 			}
 		}
@@ -212,19 +279,14 @@ func (msp *bccspmsp) validateIdentityOUsV11(id *identity) error {
 			break
 		}
 	}
-
-	// the identity should have exactly one OU role, return an error if the counter is not 1.
-	if counter == 0 {
-		return errors.Errorf("the identity does not have an OU that resolves to client or peer. OUs: %s, MSP: [%s]", OUIDs(id.GetOrganizationalUnits()), msp.name)
-	}
-	if counter > 1 {
+	if counter != 1 {
 		return errors.Errorf("the identity must be a client or a peer identity to be valid, not a combination of them. OUs: %s, MSP: [%s]", OUIDs(id.GetOrganizationalUnits()), msp.name)
 	}
 
 	return nil
 }
 
-func (msp *bccspmsp) validateIdentityOUsV142(id *identity) error {
+func (msp *bccspmsp) validateIdentityOUsV143(id *identity) error {
 	// Run the same checks as per V1
 	err := msp.validateIdentityOUsV1(id)
 	if err != nil {
@@ -271,32 +333,36 @@ func (msp *bccspmsp) validateIdentityOUsV142(id *identity) error {
 			break
 		}
 	}
-
-	// the identity should have exactly one OU role, return an error if the counter is not 1.
-	if counter == 0 {
-		return errors.Errorf("the identity does not have an OU that resolves to client, peer, orderer, or admin role. OUs: %s, MSP: [%s]", OUIDs(id.GetOrganizationalUnits()), msp.name)
-	}
-	if counter > 1 {
-		return errors.Errorf("the identity must have a client, a peer, an orderer, or an admin OU role to be valid, not a combination of them. OUs: %s, MSP: [%s]", OUIDs(id.GetOrganizationalUnits()), msp.name)
+	if counter != 1 {
+		return errors.Errorf("the identity must be a client, a peer, an orderer or an admin identity to be valid, not a combination of them. OUs: %s, MSP: [%s]", OUIDs(id.GetOrganizationalUnits()), msp.name)
 	}
 
 	return nil
 }
 
-func (msp *bccspmsp) getValidityOptsForCert(cert *x509.Certificate) x509.VerifyOptions {
+func (msp *bccspmsp) getValidityOptsForCert(cert interface{}) interface{} {
 	// First copy the opts to override the CurrentTime field
 	// in order to make the certificate passing the expiration test
 	// independently from the real local current time.
 	// This is a temporary workaround for FAB-3678
 
-	var tempOpts x509.VerifyOptions
-	tempOpts.Roots = msp.opts.Roots
-	tempOpts.DNSName = msp.opts.DNSName
-	tempOpts.Intermediates = msp.opts.Intermediates
-	tempOpts.KeyUsages = msp.opts.KeyUsages
-	tempOpts.CurrentTime = cert.NotBefore.Add(time.Second)
-
-	return tempOpts
+	if (false) {
+		var tempOpts x509.VerifyOptions
+		tempOpts.Roots = msp.opts.(*x509.VerifyOptions).Roots
+		tempOpts.DNSName = msp.opts.(*x509.VerifyOptions).DNSName
+		tempOpts.Intermediates = msp.opts.(*x509.VerifyOptions).Intermediates
+		tempOpts.KeyUsages = msp.opts.(*x509.VerifyOptions).KeyUsages
+		tempOpts.CurrentTime = cert.(*x509.Certificate).NotBefore.Add(time.Second)
+		return tempOpts
+	} else {
+		var tempOpts sm2.VerifyOptions
+		tempOpts.Roots = msp.opts.(*sm2.VerifyOptions).Roots
+		tempOpts.DNSName = msp.opts.(*sm2.VerifyOptions).DNSName
+		tempOpts.Intermediates = msp.opts.(*sm2.VerifyOptions).Intermediates
+		tempOpts.KeyUsages = msp.opts.(*sm2.VerifyOptions).KeyUsages
+		tempOpts.CurrentTime = cert.(*sm2.Certificate).NotBefore.Add(time.Second)
+		return tempOpts
+	}
 }
 
 /*
@@ -344,21 +410,37 @@ func getAuthorityKeyIdentifierFromCrl(crl *pkix.CertificateList) ([]byte, error)
 
 // getSubjectKeyIdentifierFromCert returns the Subject Key Identifier for the supplied certificate
 // Subject Key Identifier is an identifier of the public key of this certificate
-func getSubjectKeyIdentifierFromCert(cert *x509.Certificate) ([]byte, error) {
+func getSubjectKeyIdentifierFromCert(cert interface{}) ([]byte, error) {
 	var SKI []byte
 
-	for _, ext := range cert.Extensions {
-		// Subject Key Identifier is identified by the following ASN.1 tag
-		// subjectKeyIdentifier (2 5 29 14) (see https://tools.ietf.org/html/rfc3280.html)
-		if reflect.DeepEqual(ext.Id, asn1.ObjectIdentifier{2, 5, 29, 14}) {
-			_, err := asn1.Unmarshal(ext.Value, &SKI)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to unmarshal Subject Key Identifier")
-			}
+	if (false) {
+		for _, ext := range cert.(*x509.Certificate).Extensions {
+			// Subject Key Identifier is identified by the following ASN.1 tag
+			// subjectKeyIdentifier (2 5 29 14) (see https://tools.ietf.org/html/rfc3280.html)
+			if reflect.DeepEqual(ext.Id, asn1.ObjectIdentifier{2, 5, 29, 14}) {
+				_, err := asn1.Unmarshal(ext.Value, &SKI)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to unmarshal Subject Key Identifier")
+				}
 
-			return SKI, nil
+				return SKI, nil
+			}
+		}
+	} else {
+		for _, ext := range cert.(*sm2.Certificate).Extensions {
+			// Subject Key Identifier is identified by the following ASN.1 tag
+			// subjectKeyIdentifier (2 5 29 14) (see https://tools.ietf.org/html/rfc3280.html)
+			if reflect.DeepEqual(ext.Id, asn1.ObjectIdentifier{2, 5, 29, 14}) {
+				_, err := asn1.Unmarshal(ext.Value, &SKI)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to unmarshal Subject Key Identifier")
+				}
+
+				return SKI, nil
+			}
 		}
 	}
 
 	return nil, errors.New("subjectKeyIdentifier not found in certificate")
 }
+

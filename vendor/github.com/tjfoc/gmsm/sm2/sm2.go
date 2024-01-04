@@ -33,6 +33,10 @@ import (
 	"github.com/tjfoc/gmsm/sm3"
 )
 
+var (
+	default_uid = []byte{0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38}
+)
+
 const (
 	aesIV = "IV for <SM2> CTR"
 )
@@ -60,9 +64,20 @@ func SignDigitToSignData(r, s *big.Int) ([]byte, error) {
 	return asn1.Marshal(sm2Signature{r, s})
 }
 
+func SignDataToSignDigit(sign []byte) (*big.Int, *big.Int, error) {
+	var sm2Sign sm2Signature
+
+	_, err := asn1.Unmarshal(sign, &sm2Sign)
+	if err != nil {
+		return nil, nil, err
+	}
+	return sm2Sign.R, sm2Sign.S, nil
+}
+
 // sign format = 30 + len(z) + 02 + len(r) + r + 02 + len(s) + s, z being what follows its size, ie 02+len(r)+r+02+len(s)+s
 func (priv *PrivateKey) Sign(rand io.Reader, msg []byte, opts crypto.SignerOpts) ([]byte, error) {
-	r, s, err := Sign(priv, msg)
+	// r, s, err := Sign(priv, msg)
+	r, s, err := Sm2Sign(priv, msg, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +95,8 @@ func (pub *PublicKey) Verify(msg []byte, sign []byte) bool {
 	if err != nil {
 		return false
 	}
-	return Verify(pub, msg, sm2Sign.R, sm2Sign.S)
+	return Sm2Verify(pub, msg, nil, sm2Sign.R, sm2Sign.S)
+	// return Verify(pub, msg, sm2Sign.R, sm2Sign.S)
 }
 
 func (pub *PublicKey) Encrypt(data []byte) ([]byte, error) {
@@ -246,7 +262,7 @@ func Verify(pub *PublicKey, hash []byte, r, s *big.Int) bool {
 	e := new(big.Int).SetBytes(hash)
 	x.Add(x, e)
 	x.Mod(x, N)
-	return x.Cmp(r) == 0
+	return x.Cmp(r)==0
 }
 
 func Sm2Sign(priv *PrivateKey, msg, uid []byte) (r, s *big.Int, err error) {
@@ -279,6 +295,7 @@ func Sm2Sign(priv *PrivateKey, msg, uid []byte) (r, s *big.Int, err error) {
 					break
 				}
 			}
+
 		}
 		rD := new(big.Int).Mul(priv.D, r)
 		s = new(big.Int).Sub(k, rD)
@@ -323,7 +340,31 @@ func Sm2Verify(pub *PublicKey, msg, uid []byte, r, s *big.Int) bool {
 
 	x.Add(x, e)
 	x.Mod(x, N)
-	return x.Cmp(r) == 0
+	if x.Cmp(r) == 0 {
+		return true
+	} else { //为兼容旧证书，使用默认uid重新验证
+		za, err := ZA(pub, default_uid)
+		if err != nil {
+			return false
+		}
+		e, err := msgHash(za, msg)
+		if err != nil {
+			return false
+		}
+		t := new(big.Int).Add(r, s)
+		t.Mod(t, N)
+		if t.Sign() == 0 {
+			return false
+		}
+		var x *big.Int
+		x1, y1 := c.ScalarBaseMult(s.Bytes())
+		x2, y2 := c.ScalarMult(pub.X, pub.Y, t.Bytes())
+		x, _ = c.Add(x1, y1, x2, y2)
+
+		x.Add(x, e)
+		x.Mod(x, N)
+		return x.Cmp(r) == 0
+	}
 }
 
 func msgHash(za, msg []byte) (*big.Int, error) {
@@ -343,7 +384,9 @@ func ZA(pub *PublicKey, uid []byte) ([]byte, error) {
 	Entla := uint16(8 * uidLen)
 	za.Write([]byte{byte((Entla >> 8) & 0xFF)})
 	za.Write([]byte{byte(Entla & 0xFF)})
-	za.Write(uid)
+	if uidLen > 0 {
+		za.Write(uid)
+	}
 	za.Write(sm2P256ToBig(&sm2P256.a).Bytes())
 	za.Write(sm2P256.B.Bytes())
 	za.Write(sm2P256.Gx.Bytes())
@@ -352,7 +395,7 @@ func ZA(pub *PublicKey, uid []byte) ([]byte, error) {
 	xBuf := pub.X.Bytes()
 	yBuf := pub.Y.Bytes()
 	if n := len(xBuf); n < 32 {
-		xBuf = append(zeroByteSlice[:32-n], xBuf...)
+		xBuf = append(zeroByteSlice()[:32-n], xBuf...)
 	}
 	za.Write(xBuf)
 	za.Write(yBuf)
@@ -360,15 +403,17 @@ func ZA(pub *PublicKey, uid []byte) ([]byte, error) {
 }
 
 // 32byte
-var zeroByteSlice = []byte{
-	0, 0, 0, 0,
-	0, 0, 0, 0,
-	0, 0, 0, 0,
-	0, 0, 0, 0,
-	0, 0, 0, 0,
-	0, 0, 0, 0,
-	0, 0, 0, 0,
-	0, 0, 0, 0,
+func zeroByteSlice() []byte {
+	return []byte{
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+		0, 0, 0, 0,
+	}
 }
 
 /*
@@ -394,16 +439,16 @@ func Encrypt(pub *PublicKey, data []byte) ([]byte, error) {
 		x2Buf := x2.Bytes()
 		y2Buf := y2.Bytes()
 		if n := len(x1Buf); n < 32 {
-			x1Buf = append(zeroByteSlice[:32-n], x1Buf...)
+			x1Buf = append(zeroByteSlice()[:32-n], x1Buf...)
 		}
 		if n := len(y1Buf); n < 32 {
-			y1Buf = append(zeroByteSlice[:32-n], y1Buf...)
+			y1Buf = append(zeroByteSlice()[:32-n], y1Buf...)
 		}
 		if n := len(x2Buf); n < 32 {
-			x2Buf = append(zeroByteSlice[:32-n], x2Buf...)
+			x2Buf = append(zeroByteSlice()[:32-n], x2Buf...)
 		}
 		if n := len(y2Buf); n < 32 {
-			y2Buf = append(zeroByteSlice[:32-n], y2Buf...)
+			y2Buf = append(zeroByteSlice()[:32-n], y2Buf...)
 		}
 		c = append(c, x1Buf...) // x分量
 		c = append(c, y1Buf...) // y分量
@@ -421,11 +466,12 @@ func Encrypt(pub *PublicKey, data []byte) ([]byte, error) {
 		for i := 0; i < length; i++ {
 			c[96+i] ^= data[i]
 		}
-		return c, nil
+		return append([]byte{0x04}, c...), nil
 	}
 }
 
 func Decrypt(priv *PrivateKey, data []byte) ([]byte, error) {
+	data = data[1:]
 	length := len(data) - 96
 	curve := priv.Curve
 	x := new(big.Int).SetBytes(data[:32])
@@ -434,12 +480,11 @@ func Decrypt(priv *PrivateKey, data []byte) ([]byte, error) {
 	x2Buf := x2.Bytes()
 	y2Buf := y2.Bytes()
 	if n := len(x2Buf); n < 32 {
-		x2Buf = append(zeroByteSlice[:32-n], x2Buf...)
+		x2Buf = append(zeroByteSlice()[:32-n], x2Buf...)
 	}
 	if n := len(y2Buf); n < 32 {
-		y2Buf = append(zeroByteSlice[:32-n], y2Buf...)
+		y2Buf = append(zeroByteSlice()[:32-n], y2Buf...)
 	}
-
 	c, ok := kdf(x2Buf, y2Buf, length)
 	if !ok {
 		return nil, errors.New("Decrypt: failed to decrypt")
@@ -470,3 +515,43 @@ func (z *zr) Read(dst []byte) (n int, err error) {
 }
 
 var zeroReader = &zr{}
+
+func getLastBit(a *big.Int) uint {
+	return a.Bit(0)
+}
+
+func Compress(a *PublicKey) []byte {
+	buf := []byte{}
+	yp := getLastBit(a.Y)
+	buf = append(buf, a.X.Bytes()...)
+	if n := len(a.X.Bytes()); n < 32 {
+		buf = append(zeroByteSlice()[:(32-n)], buf...)
+	}
+	buf = append([]byte{byte(yp)}, buf...)
+	return buf
+}
+
+func Decompress(a []byte) *PublicKey {
+	var aa, xx, xx3 sm2P256FieldElement
+
+	P256Sm2()
+	x := new(big.Int).SetBytes(a[1:])
+	curve := sm2P256
+	sm2P256FromBig(&xx, x)
+	sm2P256Square(&xx3, &xx)       // x3 = x ^ 2
+	sm2P256Mul(&xx3, &xx3, &xx)    // x3 = x ^ 2 * x
+	sm2P256Mul(&aa, &curve.a, &xx) // a = a * x
+	sm2P256Add(&xx3, &xx3, &aa)
+	sm2P256Add(&xx3, &xx3, &curve.b)
+
+	y2 := sm2P256ToBig(&xx3)
+	y := new(big.Int).ModSqrt(y2, sm2P256.P)
+	if getLastBit(y) != uint(a[0]) {
+		y.Sub(sm2P256.P, y)
+	}
+	return &PublicKey{
+		Curve: P256Sm2(),
+		X:     x,
+		Y:     y,
+	}
+}

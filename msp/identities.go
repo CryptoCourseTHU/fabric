@@ -13,13 +13,13 @@ import (
 	"encoding/hex"
 	"encoding/pem"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/golang/protobuf/proto"
-	"github.com/hyperledger/fabric-protos-go/msp"
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/common/flogging"
+	"github.com/hyperledger/fabric-protos-go/msp"
+	"github.com/tjfoc/gmsm/sm2"
 	"github.com/pkg/errors"
 	"go.uber.org/zap/zapcore"
 )
@@ -31,34 +31,23 @@ type identity struct {
 	id *IdentityIdentifier
 
 	// cert contains the x.509 certificate that signs the public key of this instance
-	cert *x509.Certificate
+	cert interface{}
 
 	// this is the public key of this instance
 	pk bccsp.Key
 
 	// reference to the MSP that "owns" this identity
 	msp *bccspmsp
-
-	// validationMutex is used to synchronise memory operation
-	// over validated and validationErr
-	validationMutex sync.Mutex
-
-	// validated is true when the validateIdentity function
-	// has been called on this instance
-	validated bool
-
-	// validationErr contains the validation error for this
-	// instance. It can be read if validated is true
-	validationErr error
 }
 
-func newIdentity(cert *x509.Certificate, pk bccsp.Key, msp *bccspmsp) (Identity, error) {
+func newIdentity(cert interface{}, pk bccsp.Key, msp *bccspmsp) (Identity, error) {
 	if mspIdentityLogger.IsEnabledFor(zapcore.DebugLevel) {
 		mspIdentityLogger.Debugf("Creating identity instance for cert %s", certToPEM(cert))
 	}
+	var err error
 
 	// Sanitize first the certificate
-	cert, err := msp.sanitizeCert(cert)
+	cert, err = msp.sanitizeCert(cert)
 	if err != nil {
 		return nil, err
 	}
@@ -71,25 +60,33 @@ func newIdentity(cert *x509.Certificate, pk bccsp.Key, msp *bccspmsp) (Identity,
 		return nil, errors.WithMessage(err, "failed getting hash function options")
 	}
 
-	digest, err := msp.bccsp.Hash(cert.Raw, hashOpt)
+	var digest []byte
+	if (false) {
+		digest, err = msp.bccsp.Hash(cert.(*x509.Certificate).Raw, hashOpt)
+	} else {
+		digest, err = msp.bccsp.Hash(cert.(*sm2.Certificate).Raw, hashOpt)
+	}
 	if err != nil {
 		return nil, errors.WithMessage(err, "failed hashing raw certificate to compute the id of the IdentityIdentifier")
 	}
 
 	id := &IdentityIdentifier{
 		Mspid: msp.name,
-		Id:    hex.EncodeToString(digest),
-	}
+		Id:    hex.EncodeToString(digest)}
 
 	return &identity{id: id, cert: cert, pk: pk, msp: msp}, nil
 }
 
 // ExpiresAt returns the time at which the Identity expires.
 func (id *identity) ExpiresAt() time.Time {
-	return id.cert.NotAfter
+	if (false) {
+		return id.cert.(*x509.Certificate).NotAfter
+	} else {
+		return id.cert.(*sm2.Certificate).NotAfter
+	}
 }
 
-// SatisfiesPrincipal returns nil if this instance matches the supplied principal or an error otherwise
+// SatisfiesPrincipal returns null if this instance matches the supplied principal or an error otherwise
 func (id *identity) SatisfiesPrincipal(principal *msp.MSPPrincipal) error {
 	return id.msp.SatisfiesPrincipal(id, principal)
 }
@@ -134,11 +131,20 @@ func (id *identity) GetOrganizationalUnits() []*OUIdentifier {
 	}
 
 	var res []*OUIdentifier
-	for _, unit := range id.cert.Subject.OrganizationalUnit {
-		res = append(res, &OUIdentifier{
-			OrganizationalUnitIdentifier: unit,
-			CertifiersIdentifier:         cid,
-		})
+	if (false) {
+		for _, unit := range id.cert.(*x509.Certificate).Subject.OrganizationalUnit {
+			res = append(res, &OUIdentifier{
+				OrganizationalUnitIdentifier: unit,
+				CertifiersIdentifier:         cid,
+			})
+		}
+	} else {
+		for _, unit := range id.cert.(*sm2.Certificate).Subject.OrganizationalUnit {
+			res = append(res, &OUIdentifier{
+				OrganizationalUnitIdentifier: unit,
+				CertifiersIdentifier:         cid,
+			})
+		}
 	}
 
 	return res
@@ -182,16 +188,14 @@ func (id *identity) Verify(msg []byte, sig []byte) error {
 	}
 
 	if mspIdentityLogger.IsEnabledFor(zapcore.DebugLevel) {
-		mspIdentityLogger.Debugf("Verify: signer identity (certificate subject=%s issuer=%s serialnumber=%d)", id.cert.Subject, id.cert.Issuer, id.cert.SerialNumber)
-		// mspIdentityLogger.Debugf("Verify: digest = %s", hex.Dump(digest))
-		// mspIdentityLogger.Debugf("Verify: sig = %s", hex.Dump(sig))
+		mspIdentityLogger.Debugf("Verify: digest = %s", hex.Dump(digest))
+		mspIdentityLogger.Debugf("Verify: sig = %s", hex.Dump(sig))
 	}
 
 	valid, err := id.msp.bccsp.Verify(id.pk, sig, digest, nil)
 	if err != nil {
 		return errors.WithMessage(err, "could not determine the validity of the signature")
 	} else if !valid {
-		mspIdentityLogger.Warnf("The signature is invalid for (certificate subject=%s issuer=%s serialnumber=%d)", id.cert.Subject, id.cert.Issuer, id.cert.SerialNumber)
 		return errors.New("The signature is invalid")
 	}
 
@@ -200,7 +204,14 @@ func (id *identity) Verify(msg []byte, sig []byte) error {
 
 // Serialize returns a byte array representation of this identity
 func (id *identity) Serialize() ([]byte, error) {
-	pb := &pem.Block{Bytes: id.cert.Raw, Type: "CERTIFICATE"}
+	// mspIdentityLogger.Infof("Serializing identity %s", id.id)
+
+	var pb *pem.Block
+	if (false) {
+		pb = &pem.Block{Bytes: id.cert.(*x509.Certificate).Raw, Type: "CERTIFICATE"}
+	} else {
+		pb = &pem.Block{Bytes: id.cert.(*sm2.Certificate).Raw, Type: "CERTIFICATE"}
+	}
 	pemBytes := pem.EncodeToMemory(pb)
 	if pemBytes == nil {
 		return nil, errors.New("encoding of identity failed")
@@ -222,8 +233,10 @@ func (id *identity) getHashOpt(hashFamily string) (bccsp.HashOpts, error) {
 		return bccsp.GetHashOpt(bccsp.SHA256)
 	case bccsp.SHA3:
 		return bccsp.GetHashOpt(bccsp.SHA3_256)
+	case bccsp.SM3:
+		return bccsp.GetHashOpt(bccsp.SM3)
 	}
-	return nil, errors.Errorf("hash family not recognized [%s]", hashFamily)
+	return nil, errors.Errorf("hash familiy not recognized [%s]", hashFamily)
 }
 
 type signingidentity struct {
@@ -234,26 +247,18 @@ type signingidentity struct {
 	signer crypto.Signer
 }
 
-func newSigningIdentity(cert *x509.Certificate, pk bccsp.Key, signer crypto.Signer, msp *bccspmsp) (SigningIdentity, error) {
-	// mspIdentityLogger.Infof("Creating signing identity instance for ID %s", id)
+func newSigningIdentity(cert interface{}, pk bccsp.Key, signer crypto.Signer, msp *bccspmsp) (SigningIdentity, error) {
+	//mspIdentityLogger.Infof("Creating signing identity instance for ID %s", id)
 	mspId, err := newIdentity(cert, pk, msp)
 	if err != nil {
 		return nil, err
 	}
-	return &signingidentity{
-		identity: identity{
-			id:   mspId.(*identity).id,
-			cert: mspId.(*identity).cert,
-			msp:  mspId.(*identity).msp,
-			pk:   mspId.(*identity).pk,
-		},
-		signer: signer,
-	}, nil
+	return &signingidentity{identity: *mspId.(*identity), signer: signer}, nil
 }
 
 // Sign produces a signature over msg, signed by this instance
 func (id *signingidentity) Sign(msg []byte) ([]byte, error) {
-	// mspIdentityLogger.Infof("Signing message")
+	//mspIdentityLogger.Infof("Signing message")
 
 	// Compute Hash
 	hashOpt, err := id.getHashOpt(id.msp.cryptoConfig.SignatureHashFamily)
@@ -282,3 +287,4 @@ func (id *signingidentity) Sign(msg []byte) ([]byte, error) {
 func (id *signingidentity) GetPublicVersion() Identity {
 	return &id.identity
 }
+

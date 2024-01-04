@@ -1,24 +1,6 @@
-/*
-Copyright IBM Corp. 2017 All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-		 http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package mocks
 
 import (
-	"bytes"
-	"crypto"
 	"errors"
 	"hash"
 	"reflect"
@@ -26,194 +8,164 @@ import (
 	"github.com/hyperledger/fabric/bccsp"
 )
 
-type MockBCCSP struct {
-	SignArgKey    bccsp.Key
-	SignDigestArg []byte
-	SignOptsArg   bccsp.SignerOpts
+type Encryptor struct {
+	KeyArg       bccsp.Key
+	PlaintextArg []byte
+	OptsArg      bccsp.EncrypterOpts
 
-	SignValue []byte
-	SignErr   error
-
-	VerifyValue bool
-	VerifyErr   error
-
-	ExpectedSig []byte
-
-	KeyImportValue bccsp.Key
-	KeyImportErr   error
-
-	EncryptError error
-	DecryptError error
-
-	HashVal []byte
-	HashErr error
+	EncValue []byte
+	EncErr   error
 }
 
-func (*MockBCCSP) KeyGen(opts bccsp.KeyGenOpts) (bccsp.Key, error) {
-	panic("Not yet implemented")
-}
-
-func (*MockBCCSP) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (bccsp.Key, error) {
-	panic("Not yet implemented")
-}
-
-func (m *MockBCCSP) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (bccsp.Key, error) {
-	return m.KeyImportValue, m.KeyImportErr
-}
-
-func (*MockBCCSP) GetKey(ski []byte) (bccsp.Key, error) {
-	panic("Not yet implemented")
-}
-
-func (m *MockBCCSP) Hash(msg []byte, opts bccsp.HashOpts) ([]byte, error) {
-	return m.HashVal, m.HashErr
-}
-
-func (*MockBCCSP) GetHash(opts bccsp.HashOpts) (hash.Hash, error) {
-	panic("Not yet implemented")
-}
-
-func (b *MockBCCSP) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) ([]byte, error) {
-	if !reflect.DeepEqual(b.SignArgKey, k) {
+func (e *Encryptor) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterOpts) (ciphertext []byte, err error) {
+	if !reflect.DeepEqual(e.KeyArg, k) {
 		return nil, errors.New("invalid key")
 	}
-	if !reflect.DeepEqual(b.SignDigestArg, digest) {
-		return nil, errors.New("invalid digest")
+	if !reflect.DeepEqual(e.PlaintextArg, plaintext) {
+		return nil, errors.New("invalid plaintext")
 	}
-	if !reflect.DeepEqual(b.SignOptsArg, opts) {
+	if !reflect.DeepEqual(e.OptsArg, opts) {
 		return nil, errors.New("invalid opts")
 	}
 
-	return b.SignValue, b.SignErr
+	return e.EncValue, e.EncErr
 }
 
-func (b *MockBCCSP) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerOpts) (bool, error) {
-	// we want to mock a success
-	if b.VerifyValue {
-		return b.VerifyValue, nil
+type Decryptor struct {
+}
+
+func (*Decryptor) Decrypt(k bccsp.Key, ciphertext []byte, opts bccsp.DecrypterOpts) (plaintext []byte, err error) {
+	panic("implement me")
+}
+
+type Signer struct {
+	KeyArg    bccsp.Key
+	DigestArg []byte
+	OptsArg   bccsp.SignerOpts
+
+	Value []byte
+	Err   error
+}
+
+func (s *Signer) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) (signature []byte, err error) {
+	if !reflect.DeepEqual(s.KeyArg, k) {
+		return nil, errors.New("invalid key")
+	}
+	if !reflect.DeepEqual(s.DigestArg, digest) {
+		return nil, errors.New("invalid digest")
+	}
+	if !reflect.DeepEqual(s.OptsArg, opts) {
+		return nil, errors.New("invalid opts")
 	}
 
-	// we want to mock a failure because of an error
-	if b.VerifyErr != nil {
-		return b.VerifyValue, b.VerifyErr
+	return s.Value, s.Err
+}
+
+type Verifier struct {
+	KeyArg       bccsp.Key
+	SignatureArg []byte
+	DigestArg    []byte
+	OptsArg      bccsp.SignerOpts
+
+	Value bool
+	Err   error
+}
+
+func (s *Verifier) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerOpts) (valid bool, err error) {
+	if !reflect.DeepEqual(s.KeyArg, k) {
+		return false, errors.New("invalid key")
+	}
+	if !reflect.DeepEqual(s.SignatureArg, signature) {
+		return false, errors.New("invalid signature")
+	}
+	if !reflect.DeepEqual(s.DigestArg, digest) {
+		return false, errors.New("invalid digest")
+	}
+	if !reflect.DeepEqual(s.OptsArg, opts) {
+		return false, errors.New("invalid opts")
 	}
 
-	// in neither case, compare the signature with the expected one
-	return bytes.Equal(b.ExpectedSig, signature), nil
+	return s.Value, s.Err
 }
 
-func (m *MockBCCSP) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterOpts) ([]byte, error) {
-	if m.EncryptError == nil {
-		return plaintext, nil
-	} else {
-		return nil, m.EncryptError
+type Hasher struct {
+	MsgArg  []byte
+	OptsArg bccsp.HashOpts
+
+	Value     []byte
+	ValueHash hash.Hash
+	Err       error
+}
+
+func (h *Hasher) Hash(msg []byte, opts bccsp.HashOpts) (hash []byte, err error) {
+	if !reflect.DeepEqual(h.MsgArg, msg) {
+		return nil, errors.New("invalid message")
 	}
-}
-
-func (m *MockBCCSP) Decrypt(k bccsp.Key, ciphertext []byte, opts bccsp.DecrypterOpts) ([]byte, error) {
-	if m.DecryptError == nil {
-		return ciphertext, nil
-	} else {
-		return nil, m.DecryptError
+	if !reflect.DeepEqual(h.OptsArg, opts) {
+		return nil, errors.New("invalid opts")
 	}
+
+	return h.Value, h.Err
 }
 
-type MockKey struct {
-	BytesValue []byte
-	BytesErr   error
-	Symm       bool
-	PK         bccsp.Key
-	PKErr      error
-	Pvt        bool
+func (h *Hasher) GetHash(opts bccsp.HashOpts) (hash.Hash, error) {
+	if !reflect.DeepEqual(h.OptsArg, opts) {
+		return nil, errors.New("invalid opts")
+	}
+
+	return h.ValueHash, h.Err
 }
 
-func (m *MockKey) Bytes() ([]byte, error) {
-	return m.BytesValue, m.BytesErr
+type KeyGenerator struct {
+	OptsArg bccsp.KeyGenOpts
+
+	Value bccsp.Key
+	Err   error
 }
 
-func (*MockKey) SKI() []byte {
-	panic("Not yet implemented")
+func (kg *KeyGenerator) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
+	if !reflect.DeepEqual(kg.OptsArg, opts) {
+		return nil, errors.New("invalid opts")
+	}
+
+	return kg.Value, kg.Err
 }
 
-func (m *MockKey) Symmetric() bool {
-	return m.Symm
+type KeyDeriver struct {
+	KeyArg  bccsp.Key
+	OptsArg bccsp.KeyDerivOpts
+
+	Value bccsp.Key
+	Err   error
 }
 
-func (m *MockKey) Private() bool {
-	return m.Pvt
+func (kd *KeyDeriver) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (dk bccsp.Key, err error) {
+	if !reflect.DeepEqual(kd.KeyArg, k) {
+		return nil, errors.New("invalid key")
+	}
+	if !reflect.DeepEqual(kd.OptsArg, opts) {
+		return nil, errors.New("invalid opts")
+	}
+
+	return kd.Value, kd.Err
 }
 
-func (m *MockKey) PublicKey() (bccsp.Key, error) {
-	return m.PK, m.PKErr
+type KeyImporter struct {
+	RawArg  []byte
+	OptsArg bccsp.KeyImportOpts
+
+	Value bccsp.Key
+	Err   error
 }
 
-type SignerOpts struct {
-	HashFuncValue crypto.Hash
+func (ki *KeyImporter) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Key, err error) {
+	if !reflect.DeepEqual(ki.RawArg, raw) {
+		return nil, errors.New("invalid raw")
+	}
+	if !reflect.DeepEqual(ki.OptsArg, opts) {
+		return nil, errors.New("invalid opts")
+	}
+
+	return ki.Value, ki.Err
 }
 
-func (o *SignerOpts) HashFunc() crypto.Hash {
-	return o.HashFuncValue
-}
-
-type KeyGenOpts struct {
-	EphemeralValue bool
-}
-
-func (*KeyGenOpts) Algorithm() string {
-	return "Mock KeyGenOpts"
-}
-
-func (o *KeyGenOpts) Ephemeral() bool {
-	return o.EphemeralValue
-}
-
-type KeyStore struct {
-	GetKeyValue bccsp.Key
-	GetKeyErr   error
-	StoreKeyErr error
-}
-
-func (*KeyStore) ReadOnly() bool {
-	panic("Not yet implemented")
-}
-
-func (ks *KeyStore) GetKey(ski []byte) (bccsp.Key, error) {
-	return ks.GetKeyValue, ks.GetKeyErr
-}
-
-func (ks *KeyStore) StoreKey(k bccsp.Key) error {
-	return ks.StoreKeyErr
-}
-
-type KeyImportOpts struct{}
-
-func (*KeyImportOpts) Algorithm() string {
-	return "Mock KeyImportOpts"
-}
-
-func (*KeyImportOpts) Ephemeral() bool {
-	panic("Not yet implemented")
-}
-
-type (
-	EncrypterOpts struct{}
-	DecrypterOpts struct{}
-)
-
-type HashOpts struct{}
-
-func (HashOpts) Algorithm() string {
-	return "Mock HashOpts"
-}
-
-type KeyDerivOpts struct {
-	EphemeralValue bool
-}
-
-func (*KeyDerivOpts) Algorithm() string {
-	return "Mock KeyDerivOpts"
-}
-
-func (o *KeyDerivOpts) Ephemeral() bool {
-	return o.EphemeralValue
-}
