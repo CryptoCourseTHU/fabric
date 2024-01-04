@@ -59,6 +59,14 @@ const (
 
 	// X509Certificate Label for X509 certificate related operation
 	X509Certificate = "X509Certificate"
+	
+	SM2 = "SM2"
+	// SM2ReRand SM2 key re-randomization
+	SM2ReRand = "SM2_RERAND"
+	// SM3
+	SM3 = "SM3"
+	// SM4
+	SM4 = "SM4"
 )
 
 // ECDSAKeyGenOpts contains options for ECDSA key generation.
