@@ -16,6 +16,7 @@ limitations under the License.
 package sw
 
 import (
+	"fmt"
 	"hash"
 	"reflect"
 
@@ -69,6 +70,8 @@ func New(keyStore bccsp.KeyStore) (*CSP, error) {
 
 // KeyGen generates a key using opts.
 func (csp *CSP) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
+	fmt.Println("----------KeyGen----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if opts == nil {
 		return nil, errors.New("Invalid Opts parameter. It must not be nil.")
@@ -78,6 +81,7 @@ func (csp *CSP) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
 	if !found {
 		return nil, errors.Errorf("Unsupported 'KeyGenOpts' provided [%v]", opts)
 	}
+	fmt.Println("keyGenerator:", reflect.TypeOf(keyGenerator))
 
 	k, err = keyGenerator.KeyGen(opts)
 	if err != nil {
@@ -99,6 +103,8 @@ func (csp *CSP) KeyGen(opts bccsp.KeyGenOpts) (k bccsp.Key, err error) {
 // KeyDeriv derives a key from k using opts.
 // The opts argument should be appropriate for the primitive used.
 func (csp *CSP) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (dk bccsp.Key, err error) {
+	fmt.Println("----------KeyDeriv----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if k == nil {
 		return nil, errors.New("Invalid Key. It must not be nil.")
@@ -111,6 +117,7 @@ func (csp *CSP) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (dk bccsp.Key, er
 	if !found {
 		return nil, errors.Errorf("Unsupported 'Key' provided [%v]", k)
 	}
+	fmt.Println("keyDeriver:", reflect.TypeOf(keyDeriver))
 
 	k, err = keyDeriver.KeyDeriv(k, opts)
 	if err != nil {
@@ -132,6 +139,8 @@ func (csp *CSP) KeyDeriv(k bccsp.Key, opts bccsp.KeyDerivOpts) (dk bccsp.Key, er
 // KeyImport imports a key from its raw representation using opts.
 // The opts argument should be appropriate for the primitive used.
 func (csp *CSP) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Key, err error) {
+	fmt.Println("----------KeyImport----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if raw == nil {
 		return nil, errors.New("Invalid raw. It must not be nil.")
@@ -144,6 +153,7 @@ func (csp *CSP) KeyImport(raw interface{}, opts bccsp.KeyImportOpts) (k bccsp.Ke
 	if !found {
 		return nil, errors.Errorf("Unsupported 'KeyImportOpts' provided [%v]", opts)
 	}
+	fmt.Println("keyImporter:", reflect.TypeOf(keyImporter))
 
 	k, err = keyImporter.KeyImport(raw, opts)
 	if err != nil {
@@ -175,6 +185,8 @@ func (csp *CSP) GetKey(ski []byte) (k bccsp.Key, err error) {
 
 // Hash hashes messages msg using options opts.
 func (csp *CSP) Hash(msg []byte, opts bccsp.HashOpts) (digest []byte, err error) {
+	fmt.Println("----------Hash----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if opts == nil {
 		return nil, errors.New("Invalid opts. It must not be nil.")
@@ -184,6 +196,7 @@ func (csp *CSP) Hash(msg []byte, opts bccsp.HashOpts) (digest []byte, err error)
 	if !found {
 		return nil, errors.Errorf("Unsupported 'HashOpt' provided [%v]", opts)
 	}
+	fmt.Println("hasher:", reflect.TypeOf(hasher))
 
 	digest, err = hasher.Hash(msg, opts)
 	if err != nil {
@@ -221,6 +234,8 @@ func (csp *CSP) GetHash(opts bccsp.HashOpts) (h hash.Hash, err error) {
 // the caller is responsible for hashing the larger message and passing
 // the hash (as digest).
 func (csp *CSP) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) (signature []byte, err error) {
+	fmt.Println("----------Sign----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if k == nil {
 		return nil, errors.New("Invalid Key. It must not be nil.")
@@ -234,6 +249,7 @@ func (csp *CSP) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) (signatu
 	if !found {
 		return nil, errors.Errorf("Unsupported 'SignKey' provided [%s]", keyType)
 	}
+	fmt.Println("signer:", reflect.TypeOf(signer))
 
 	signature, err = signer.Sign(k, digest, opts)
 	if err != nil {
@@ -245,6 +261,8 @@ func (csp *CSP) Sign(k bccsp.Key, digest []byte, opts bccsp.SignerOpts) (signatu
 
 // Verify verifies signature against key k and digest
 func (csp *CSP) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerOpts) (valid bool, err error) {
+	fmt.Println("----------Verify----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if k == nil {
 		return false, errors.New("Invalid Key. It must not be nil.")
@@ -260,6 +278,7 @@ func (csp *CSP) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerO
 	if !found {
 		return false, errors.Errorf("Unsupported 'VerifyKey' provided [%v]", k)
 	}
+	fmt.Println("verifier:", reflect.TypeOf(verifier))
 
 	valid, err = verifier.Verify(k, signature, digest, opts)
 	if err != nil {
@@ -272,6 +291,8 @@ func (csp *CSP) Verify(k bccsp.Key, signature, digest []byte, opts bccsp.SignerO
 // Encrypt encrypts plaintext using key k.
 // The opts argument should be appropriate for the primitive used.
 func (csp *CSP) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterOpts) ([]byte, error) {
+	fmt.Println("----------Encrypt----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if k == nil {
 		return nil, errors.New("Invalid Key. It must not be nil.")
@@ -281,6 +302,7 @@ func (csp *CSP) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterOpts)
 	if !found {
 		return nil, errors.Errorf("Unsupported 'EncryptKey' provided [%v]", k)
 	}
+	fmt.Println("encryptor:", reflect.TypeOf(encryptor))
 
 	return encryptor.Encrypt(k, plaintext, opts)
 }
@@ -288,6 +310,8 @@ func (csp *CSP) Encrypt(k bccsp.Key, plaintext []byte, opts bccsp.EncrypterOpts)
 // Decrypt decrypts ciphertext using key k.
 // The opts argument should be appropriate for the primitive used.
 func (csp *CSP) Decrypt(k bccsp.Key, ciphertext []byte, opts bccsp.DecrypterOpts) (plaintext []byte, err error) {
+	fmt.Println("----------Decrypt----------")
+	fmt.Println("opts:", reflect.TypeOf(opts))
 	// Validate arguments
 	if k == nil {
 		return nil, errors.New("Invalid Key. It must not be nil.")
@@ -297,6 +321,7 @@ func (csp *CSP) Decrypt(k bccsp.Key, ciphertext []byte, opts bccsp.DecrypterOpts
 	if !found {
 		return nil, errors.Errorf("Unsupported 'DecryptKey' provided [%v]", k)
 	}
+	fmt.Println("decryptor:", reflect.TypeOf(decryptor))
 
 	plaintext, err = decryptor.Decrypt(k, ciphertext, opts)
 	if err != nil {

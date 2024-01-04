@@ -22,6 +22,7 @@ type config struct {
 	aesBitLength  int
 }
 
+// 设置默认的安全等级、Hash函数
 func (conf *config) setSecurityLevel(securityLevel int, hashFamily string) (err error) {
 	switch hashFamily {
 	case "SHA2":

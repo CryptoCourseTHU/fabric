@@ -8,6 +8,7 @@ package factory
 
 // GetDefaultOpts offers a default implementation for Opts
 // returns a new instance every time
+// 默认使用SW，并且使用SHA2，256，未设置FileKeystore（因此默认使用DummyKeyStore）
 func GetDefaultOpts() *FactoryOpts {
 	return &FactoryOpts{
 		Default: "SW",

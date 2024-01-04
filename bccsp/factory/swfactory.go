@@ -16,6 +16,7 @@ limitations under the License.
 package factory
 
 import (
+	"fmt"
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/pkg/errors"
@@ -35,6 +36,7 @@ func (f *SWFactory) Name() string {
 }
 
 // Get returns an instance of BCCSP using Opts.
+// 传入一个config，返回一个swBCCSP实例
 func (f *SWFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 	// Validate arguments
 	if config == nil || config.SW == nil {
@@ -56,6 +58,10 @@ func (f *SWFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 		ks = sw.NewDummyKeyStore()
 	}
 
+	fmt.Println("----------SWFactory Get----------")
+	fmt.Println("swOpts.Security:", swOpts.Security)
+	fmt.Println("swOpts.Hash:", swOpts.Hash)
+	fmt.Println("ks:", ks)
 	return sw.NewWithParams(swOpts.Security, swOpts.Hash, ks)
 }
 

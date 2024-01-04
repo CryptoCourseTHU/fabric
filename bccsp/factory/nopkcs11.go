@@ -37,6 +37,11 @@ func InitFactories(config *FactoryOpts) error {
 	return factoriesInitError
 }
 
+// 初始化，设置一个默认的BCCSP，赋值给defaultBCCSP
+// 使用SWFactory
+// Hash: SHA2
+// Security: 256
+// FileKeystore: DummyKeyStore
 func initFactories(config *FactoryOpts) error {
 	// Take some precautions on default opts
 	if config == nil {

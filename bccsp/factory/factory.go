@@ -39,11 +39,17 @@ type BCCSPFactory interface {
 }
 
 // GetDefault returns a non-ephemeral (long-term) BCCSP
+// 其它模块通过调用GetDefault()来获取BCCSP
 func GetDefault() bccsp.BCCSP {
 	if defaultBCCSP == nil {
 		logger.Debug("Before using BCCSP, please call InitFactories(). Falling back to bootBCCSP.")
 		bootBCCSPInitOnce.Do(func() {
 			var err error
+			// 初始化，设置一个默认的BCCSP，赋值给bootBCCSP
+			// 使用SWFactory
+			// Hash: SHA2
+			// Security: 256
+			// FileKeystore: DummyKeyStore
 			bootBCCSP, err = (&SWFactory{}).Get(GetDefaultOpts())
 			if err != nil {
 				panic("BCCSP Internal error, failed initialization with GetDefaultOpts!")
