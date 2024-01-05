@@ -95,7 +95,7 @@ func NewChannelConfig(channelGroup *cb.ConfigGroup, bccsp bccsp.BCCSP) (*Channel
 		return nil, err
 	}
 
-	mspConfigHandler := NewMSPConfigHandler(channelCapabilities.MSPVersion(), bccsp)
+	mspConfigHandler := NewMSPConfigHandler(channelCapabilities.MSPVersion())
 
 	var err error
 	for groupName, group := range channelGroup.Groups {

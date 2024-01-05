@@ -101,7 +101,7 @@ func loadLocalMSP(bccsp bccsp.BCCSP) msp.MSP {
 		mspLogger.Panicf("msp type " + mspType + " unknown")
 	}
 
-	mspInst, err := msp.New(newOpts, bccsp)
+	mspInst, err := msp.New(newOpts)
 	if err != nil {
 		mspLogger.Fatalf("Failed to initialize local MSP, received err %+v", err)
 	}

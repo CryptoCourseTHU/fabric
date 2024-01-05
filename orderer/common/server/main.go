@@ -586,7 +586,7 @@ func loadLocalMSP(conf *localconfig.TopLevel) msp.MSP {
 		logger.Panicf("MSP option for type %s is not found", typ)
 	}
 
-	localmsp, err := msp.New(opts, factory.GetDefault())
+	localmsp, err := msp.New(opts)
 	if err != nil {
 		logger.Panicf("Failed to load local MSP: %v", err)
 	}
