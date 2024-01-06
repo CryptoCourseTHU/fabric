@@ -20,7 +20,7 @@ package factory
 // returns a new instance every time
 func GetDefaultOpts() *FactoryOpts {
 	return &FactoryOpts{
-		Default: "GM",
+		Default: "SW",
 		SW: &SwOpts{
 			Hash: "SHA2",
 			Security:   256,
@@ -33,4 +33,3 @@ func GetDefaultOpts() *FactoryOpts {
 func (o *FactoryOpts) FactoryName() string {
 	return o.Default
 }
-

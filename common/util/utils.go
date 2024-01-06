@@ -12,9 +12,9 @@ import (
 	"io"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/factory"
+	"github.com/golang/protobuf/ptypes/timestamp"
 )
 
 // ComputeSHA256 returns SHA2-256 on data
@@ -22,6 +22,15 @@ func ComputeSHA256(data []byte) (hash []byte) {
 	hash, err := factory.GetDefault().Hash(data, &bccsp.SHA256Opts{})
 	if err != nil {
 		panic(fmt.Errorf("Failed computing SHA256 on [% x]", data))
+	}
+	return
+}
+
+// ComputeSHA256 returns SHA2-256 on data
+func ComputeGMSM3(data []byte) (hash []byte) {
+	hash, err := factory.GetDefault().Hash(data, &bccsp.GMSM3Opts{})
+	if err != nil {
+		panic(fmt.Errorf("Failed computing GMSM3 on [% x]", data))
 	}
 	return
 }
@@ -81,7 +90,6 @@ func ToChaincodeArgs(args ...string) [][]byte {
 
 // ConcatenateBytes is useful for combining multiple arrays of bytes, especially for
 // signatures or digests over multiple fields
-// This way is more efficient in speed
 func ConcatenateBytes(data ...[]byte) []byte {
 	finalLength := 0
 	for _, slice := range data {
@@ -90,7 +98,11 @@ func ConcatenateBytes(data ...[]byte) []byte {
 	result := make([]byte, finalLength)
 	last := 0
 	for _, slice := range data {
-		last += copy(result[last:], slice)
+		for i := range slice {
+			result[i+last] = slice[i]
+		}
+		last += len(slice)
 	}
 	return result
 }
+
