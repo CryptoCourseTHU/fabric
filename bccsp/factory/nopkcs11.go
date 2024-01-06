@@ -1,4 +1,3 @@
-//go:build !pkcs11
 // +build !pkcs11
 
 /*
@@ -11,18 +10,17 @@ package factory
 
 import (
 	"reflect"
-
 	"github.com/hyperledger/fabric/bccsp"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/mitchellh/mapstructure"
 )
 
 const pkcs11Enabled = false
 
 // FactoryOpts holds configuration information used to initialize factory implementations
 type FactoryOpts struct {
-	Default string  `json:"default" yaml:"Default"`
-	SW      *SwOpts `json:"SW,omitempty" yaml:"SW,omitempty"`
+	Default string  `mapstructure:"default" json:"default" yaml:"Default"`
+	SW       *SwOpts `mapstructure:"SW,omitempty" json:"SW,omitempty" yaml:"SwOpts"`
 }
 
 // InitFactories must be called before using factory interfaces
@@ -37,11 +35,6 @@ func InitFactories(config *FactoryOpts) error {
 	return factoriesInitError
 }
 
-// 初始化，设置一个默认的BCCSP，赋值给defaultBCCSP
-// 使用SWFactory
-// Hash: SHA2
-// Security: 256
-// FileKeystore: DummyKeyStore
 func initFactories(config *FactoryOpts) error {
 	// Take some precautions on default opts
 	if config == nil {
@@ -49,7 +42,7 @@ func initFactories(config *FactoryOpts) error {
 	}
 
 	if config.Default == "" {
-		config.Default = "SW"
+		config.Default = "GM"
 	}
 
 	if config.SW == nil {
@@ -58,7 +51,16 @@ func initFactories(config *FactoryOpts) error {
 
 	// Software-Based BCCSP
 	if config.Default == "SW" && config.SW != nil {
-		f := &SWFactory{}
+		f := &GMFactory{}
+		var err error
+		defaultBCCSP, err = initBCCSP(f, config)
+		if err != nil {
+			return errors.Wrapf(err, "Failed initializing BCCSP")
+		}
+	}
+	// Software-Based BCCSP
+	if config.Default == "GM" && config.SW != nil {
+		f := &GMFactory{}
 		var err error
 		defaultBCCSP, err = initBCCSP(f, config)
 		if err != nil {
@@ -77,6 +79,8 @@ func initFactories(config *FactoryOpts) error {
 func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	var f BCCSPFactory
 	switch config.Default {
+	case "GM":
+		f = &GMFactory{}
 	case "SW":
 		f = &SWFactory{}
 	default:
@@ -90,8 +94,6 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	return csp, nil
 }
 
-// StringToKeyIds returns a DecodeHookFunc that converts
-// strings to pkcs11.KeyIDMapping.
 func StringToKeyIds() mapstructure.DecodeHookFunc {
 	return func(
 		f reflect.Type,
@@ -100,3 +102,5 @@ func StringToKeyIds() mapstructure.DecodeHookFunc {
 		return data, nil
 	}
 }
+
+

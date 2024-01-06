@@ -1,4 +1,3 @@
-//go:build pkcs11
 // +build pkcs11
 
 /*
@@ -11,21 +10,19 @@ package factory
 
 import (
 	"reflect"
-	"strings"
-
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/pkcs11"
-	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
+	"github.com/mitchellh/mapstructure"
 )
 
 const pkcs11Enabled = false
 
 // FactoryOpts holds configuration information used to initialize factory implementations
 type FactoryOpts struct {
-	Default string             `json:"default" yaml:"Default"`
-	SW      *SwOpts            `json:"SW,omitempty" yaml:"SW,omitempty"`
-	PKCS11  *pkcs11.PKCS11Opts `json:"PKCS11,omitempty" yaml:"PKCS11"`
+	Default string             `mapstructure:"default" json:"default" yaml:"Default"`
+	SW       *SwOpts            `mapstructure:"SW,omitempty" json:"SW,omitempty" yaml:"SwOpts"`
+	PKCS11   *pkcs11.PKCS11 `mapstructure:"PKCS11,omitempty" json:"PKCS11,omitempty" yaml:"PKCS11"`
 }
 
 // InitFactories must be called before using factory interfaces
@@ -47,11 +44,21 @@ func initFactories(config *FactoryOpts) error {
 	}
 
 	if config.Default == "" {
-		config.Default = "SW"
+		config.Default = "GM"
 	}
 
 	if config.SW == nil {
-		config.SW = GetDefaultOpts().SW
+		config.SW = GetDefaultOpts().SwOpts
+	}
+
+	// Software-Based BCCSP
+	if config.Default == "GM" && config.SW != nil {
+		f := &GMFactory{}
+		var err error
+		defaultBCCSP, err = initBCCSP(f, config)
+		if err != nil {
+			return errors.Wrap(err, "Failed initializing SW.BCCSP")
+		}
 	}
 
 	// Software-Based BCCSP
@@ -85,6 +92,8 @@ func initFactories(config *FactoryOpts) error {
 func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	var f BCCSPFactory
 	switch config.Default {
+	case "GM":
+		f = &GMFactory{}
 	case "SW":
 		f = &SWFactory{}
 	case "PKCS11":
@@ -100,8 +109,6 @@ func GetBCCSPFromOpts(config *FactoryOpts) (bccsp.BCCSP, error) {
 	return csp, nil
 }
 
-// StringToKeyIds returns a DecodeHookFunc that converts
-// strings to pkcs11.KeyIDMapping.
 func StringToKeyIds() mapstructure.DecodeHookFunc {
 	return func(
 		f reflect.Type,
@@ -131,3 +138,4 @@ func StringToKeyIds() mapstructure.DecodeHookFunc {
 		return res, nil
 	}
 }
+

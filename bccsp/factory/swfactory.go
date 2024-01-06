@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-	http://www.apache.org/licenses/LICENSE-2.0
+		 http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@ limitations under the License.
 package factory
 
 import (
-	"fmt"
 	"github.com/hyperledger/fabric/bccsp"
 	"github.com/hyperledger/fabric/bccsp/sw"
 	"github.com/pkg/errors"
@@ -36,7 +35,6 @@ func (f *SWFactory) Name() string {
 }
 
 // Get returns an instance of BCCSP using Opts.
-// 传入一个config，返回一个swBCCSP实例
 func (f *SWFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 	// Validate arguments
 	if config == nil || config.SW == nil {
@@ -58,22 +56,31 @@ func (f *SWFactory) Get(config *FactoryOpts) (bccsp.BCCSP, error) {
 		ks = sw.NewDummyKeyStore()
 	}
 
-	fmt.Println("----------SWFactory Get----------")
-	fmt.Println("swOpts.Security:", swOpts.Security)
-	fmt.Println("swOpts.Hash:", swOpts.Hash)
-	fmt.Println("ks:", ks)
 	return sw.NewWithParams(swOpts.Security, swOpts.Hash, ks)
 }
 
 // SwOpts contains options for the SWFactory
 type SwOpts struct {
 	// Default algorithms when not specified (Deprecated?)
-	Security     int               `json:"security" yaml:"Security"`
-	Hash         string            `json:"hash" yaml:"Hash"`
-	FileKeystore *FileKeystoreOpts `json:"filekeystore,omitempty" yaml:"FileKeyStore,omitempty"`
+	Security   int    `mapstructure:"security" json:"security" yaml:"Security"`
+	Hash string `mapstructure:"hash" json:"hash" yaml:"Hash"`
+	SecLevel   int    `mapstructure:"security" json:"security" yaml:"Security"`
+	HashFamily string `mapstructure:"hash" json:"hash" yaml:"Hash"`
+
+	// Keystore Options
+	Ephemeral     bool               `mapstructure:"tempkeys,omitempty" json:"tempkeys,omitempty"`
+	FileKeystore  *FileKeystoreOpts  `mapstructure:"filekeystore,omitempty" json:"filekeystore,omitempty" yaml:"FileKeyStore"`
+	DummyKeystore *DummyKeystoreOpts `mapstructure:"dummykeystore,omitempty" json:"dummykeystore,omitempty"`
+	InmemKeystore *InmemKeystoreOpts `mapstructure:"inmemkeystore,omitempty" json:"inmemkeystore,omitempty"`
 }
 
 // Pluggable Keystores, could add JKS, P12, etc..
 type FileKeystoreOpts struct {
-	KeyStorePath string `yaml:"KeyStore"`
+	KeyStorePath string `mapstructure:"keystore" yaml:"KeyStore"`
 }
+
+type DummyKeystoreOpts struct{}
+
+// InmemKeystoreOpts - empty, as there is no config for the in-memory keystore
+type InmemKeystoreOpts struct{}
+

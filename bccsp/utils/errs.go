@@ -14,23 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package factory
+package utils
 
-// GetDefaultOpts offers a default implementation for Opts
-// returns a new instance every time
-func GetDefaultOpts() *FactoryOpts {
-	return &FactoryOpts{
-		Default: "SW",
-		SW: &SwOpts{
-			Hash: "SHA2",
-			Security:   256,
-			Ephemeral:  true,
-		},
+// ErrToString converts and error to a string. If the error is nil, it returns the string "<clean>"
+func ErrToString(err error) string {
+	if err != nil {
+		return err.Error()
 	}
-}
 
-// FactoryName returns the name of the provider
-func (o *FactoryOpts) FactoryName() string {
-	return o.Default
+	return "<clean>"
 }
-
