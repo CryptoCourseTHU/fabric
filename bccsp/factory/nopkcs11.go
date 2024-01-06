@@ -51,7 +51,7 @@ func initFactories(config *FactoryOpts) error {
 
 	// Software-Based BCCSP
 	if config.Default == "SW" && config.SW != nil {
-		f := &GMFactory{}
+		f := &SWFactory{}
 		var err error
 		defaultBCCSP, err = initBCCSP(f, config)
 		if err != nil {
